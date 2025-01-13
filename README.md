@@ -76,7 +76,7 @@ This will generate the following files:
 
 ## Customization and Updating the Test
 
-The framework can be used for any TCP protocol. After running the generate_module.py script, you can modify the generated test_search.c file to select which protocol function to test. Simply add the protocol-specific function calls in the test file.
+The framework can be used for any TCP protocol. After running the generate_module.py script, you need to modify the generated test_search.c file. The parts that need to be updated define by //NEED UPDATE: comment.
 
 For example, if you're using the SEARCH protocol and the function is search_update, make sure to update test_search.c to include the following:
 

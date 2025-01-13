@@ -364,7 +364,7 @@ int main(int argc, char *argv[]) {
     struct tcp_sock *tp = tcp_sk(sk_ptr);
     struct bictcp *ca = inet_csk_ca(sk_ptr);
 
-    // Call reset function of the protocol here, if needed
+    // NEED UPDATE: Call reset function of the protocol here, if needed
     // Example: bictcp_search_reset(ca);
 
     char line[256];
@@ -380,25 +380,26 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        // Variables to store parsed values
-        uint32_t now_us, mss, rtt_us;
-        uint64_t bytes_acked;
+        // NEED UPDATE: Variables to store parsed values
+        //For example
+        // uint32_t now_us, mss, rtt_us;
+        // uint64_t bytes_acked;
 
-        // Parse the CSV line
-        if (sscanf(line, "%u,%lu,%u,%u", &now_us, &bytes_acked, &mss, &rtt_us) != 4) {
-            fprintf(stderr, "Invalid line format at line %d: %s", line_number, line);
-            continue;
-        }
+        // NEED UPDATE: Parse the CSV line
+        // if (sscanf(line, "%u,%lu,%u,%u", &now_us, &bytes_acked, &mss, &rtt_us) != 4) {
+        //     fprintf(stderr, "Invalid line format at line %d: %s", line_number, line);
+        //     continue;
+        // }
 
-        // Set parsed values to the mock structure
-        tp->tcp_mstamp = now_us;
-        tp->bytes_acked = bytes_acked;
-        tp->mss_cache = mss;
+        // NEED UPDATE: Set parsed values to the mock structure
+        // tp->tcp_mstamp = now_us;
+        // tp->bytes_acked = bytes_acked;
+        // tp->mss_cache = mss;
 
-        // Call the function or the relevant function for the running protocol
+        // NEED UPDATE: Call the function or the relevant function for the running protocol
         // Example: search_update(sk_ptr, rtt_us);
 
-        // Print debug information
+        // NEED UPDATE:Print debug information
         // Example:
         // printf("Line %d:\\n", line_number);
         // printf("  now_us: %u\\n", now_us);
