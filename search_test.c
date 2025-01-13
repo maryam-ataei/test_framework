@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
         // Call the function or the relevant function for the running protocol
         // Example: search_update(sk_ptr, rtt_us);
         search_update(sk_ptr, rtt_us);
-        
+
         // Print debug information
         // Example:
         // printf("Line %d:\n", line_number);
