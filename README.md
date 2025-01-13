@@ -111,9 +111,13 @@ To run the test, use the following command:
 The CSV file should have the following columns in this order:
 
 Column 1: now_us - The current timestamp in microseconds.
+
 Column 2: bytes_acked - The number of bytes acknowledged.
+
 Column 3: mss - The maximum segment size.
+
 Column 4: rtt_us - The round-trip time in microseconds.
+
 The first line of the CSV file will be skipped if it contains headers.
 
 ## Output
