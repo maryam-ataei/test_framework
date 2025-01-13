@@ -36,11 +36,11 @@ In the original protocol source code, you need to label the section containing t
 
 Example:
 
-`// protocol_name_begin
+// protocol_name_begin
 
   Code that implements the protocol logic
   
-// protocol_name_end`
+// protocol_name_end
 
 #### Labeling for Definitions (for search_defs.h):
 
@@ -48,11 +48,11 @@ For function declarations and necessary definitions, label them in your original
 
 Example:
 
-`// protocol_name_defs_begin
+// protocol_name_defs_begin
 
 // Function declarations and other necessary definitions
 
-// protocol_name_defs_end`
+// protocol_name_defs_end
 
 These labeled sections will be extracted and placed in the corresponding generated files.
 
