@@ -44,18 +44,20 @@ Example:
   Code that implements the protocol logic
   
 // protocol_name_end
+```
 
 #### Labeling for Definitions (for search_defs.h):
 
 For function declarations and necessary definitions, label them in your original file as follows:
 
 Example:
-
+```c
 // protocol_name_defs_begin
 
 // Function declarations and other necessary definitions
 
 // protocol_name_defs_end
+```
 
 These labeled sections will be extracted and placed in the corresponding generated files.
 
