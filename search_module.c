@@ -1,21 +1,16 @@
 #include "tcp.h"
-#include "search_defs.h"
 #include <string.h>
+#include "search_defs.h"
 
-#define MAX_US_INT 0xffff
-#define SEARCH_TOTAL_BINS 25
-#define SEARCH_BINS 10
-#define SEARCH_EXTRA_BINS 15
+#define MAX_US_INT 0xffff 
+#define SEARCH_BINS 10		/* Number of bins in a window */
+#define SEARCH_EXTRA_BINS 15 /* Number of additional bins to cover data after shiftting by RTT */
+#define SEARCH_TOTAL_BINS 25 	/* Total number of bins containing essential bins to cover RTT shift */
 
-uint32_t search_window_duration_factor = 35;
-uint32_t search_thresh = 35;
-uint32_t cwnd_rollback = 0;
-uint32_t search_missed_bins_threshold = 2;
-
-uint32_t bictcp_clock_us(struct sock *sk)
-{
-	return tcp_sk(sk)->tcp_mstamp;
-}
+int32_t search_window_duration_factor  = 35;
+int32_t search_thresh  = 35;
+int32_t cwnd_rollback  = 0;
+int32_t search_missed_bins_threshold = 2;
 
 void bictcp_search_reset(struct bictcp *ca)
 {
@@ -25,6 +20,12 @@ void bictcp_search_reset(struct bictcp *ca)
 	ca->search.bin_end_us = 0;
 	ca->search.scale_factor = 0;
 }
+
+uint32_t bictcp_clock_us(struct sock *sk)
+{
+	return tcp_sk(sk)->tcp_mstamp;
+}
+
 
 /* Scale bin value to fit bin size, rescale previous bins.
  * Return amount scaled.
@@ -232,4 +233,3 @@ void search_update(struct sock *sk, uint32_t rtt_us)
 		}
 	}
 }
-
