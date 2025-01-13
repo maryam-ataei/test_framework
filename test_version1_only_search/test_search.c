@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <string.h>
 #include "search.h"
-#include "search_defs.h"
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -20,20 +19,8 @@ int main(int argc, char *argv[]) {
 
     // Initialize the mock structure
     struct sock sk = {0};
-    struct sock *sk_ptr = &sk;
-
-    // Allocate memory for bictcp
-    sk_ptr->bictcp = malloc(sizeof(struct bictcp));
-    if (!sk_ptr->bictcp) {
-        fprintf(stderr, "Failed to allocate memory for bictcp.\n");
-        fclose(file);
-        return 1;
-    }
-
-    struct tcp_sock *tp = tcp_sk(sk_ptr);
-    struct bictcp *ca = inet_csk_ca(sk_ptr);
-
-    bictcp_search_reset(ca);
+    struct tcp_sock *tp = &sk.tcp_sock;
+    struct bictcp *ca = &sk.bictcp;
 
     char line[256];
     int line_number = 0;
@@ -59,12 +46,11 @@ int main(int argc, char *argv[]) {
         }
 
         // Set parsed values to the mock structure
-        tp->tcp_mstamp = now_us;
         tp->bytes_acked = bytes_acked;
         tp->mss_cache = mss;
 
         // Call the search_update function
-        search_update(sk_ptr, rtt_us);
+        search_update(&sk, now_us, rtt_us);
 
         // Print debug information
         printf("Line %d:\n", line_number);
@@ -80,8 +66,6 @@ int main(int argc, char *argv[]) {
         printf("\n");
     }
 
-    // Clean up
-    free(sk_ptr->bictcp);
     fclose(file);
 
     printf("Finished processing.\n");
