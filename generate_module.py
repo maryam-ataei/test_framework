@@ -97,12 +97,11 @@ def extract_tcp_sock_fields(module_content):
         return []
 
 
-def generate_tcp_h(input_file, keyword, output_dir):
+def generate_tcp_h(input_file, keyword):
     """
     Generate the tcp.h file with mock implementation of Linux kernel's sock structure.
     :param input_file: The source file to process.
     :param keyword: The keyword identifying the protocol.
-    :param output_dir: The directory to store generated files.
     """
     try:
         # Read the input file to check for the structures used in search_module.c
@@ -136,10 +135,11 @@ def generate_tcp_h(input_file, keyword, output_dir):
 """
 
         # Create output directory if not exists
-        os.makedirs(output_dir, exist_ok=True)
+        # os.makedirs(output_dir, exist_ok=True)
 
         # Write to tcp.h
-        tcp_h_file = os.path.join(output_dir, f"tcp.h")
+        cwd = os.getcwd()
+        tcp_h_file = os.path.join(cwd, f"tcp.h")
         with open(tcp_h_file, 'w') as outfile:
             outfile.write("#ifndef TCP_H\n#define TCP_H\n\n")
             outfile.write("#include <stdint.h>\n\n")
@@ -162,16 +162,15 @@ def generate_tcp_h(input_file, keyword, output_dir):
         print(f"Error generating tcp.h file: {e}")
 
 
-def generate_files(input_file, keyword, output_dir):
+def generate_files(input_file, keyword):
     """
     Generate the module, defs, and tcp.h files from the input file.
     :param input_file: The source file to process.
     :param keyword: The keyword identifying the protocol.
-    :param output_dir: The directory to store generated files.
     """
     try:
         # Create output directory if not exists
-        os.makedirs(output_dir, exist_ok=True)
+        # os.makedirs(output_dir, exist_ok=True)
 
         # Extract and process module content
         module_content = extract_marked_sections(input_file, keyword, "module")
@@ -192,7 +191,8 @@ def generate_files(input_file, keyword, output_dir):
             module_content = apply_replacements(module_content, replacements)
 
             # Write to module file
-            module_file = os.path.join(output_dir, f"{keyword}_module.c")
+            cwd = os.getcwd()
+            module_file = os.path.join(cwd, f"{keyword}_module.c")
             with open(module_file, 'w') as outfile:
                 outfile.write('#include "tcp.h"\n')
                 outfile.write('#include <string.h>\n')
@@ -222,7 +222,8 @@ def generate_files(input_file, keyword, output_dir):
             function_declarations = extract_function_declarations(module_content)
 
             # Write to defs file
-            defs_file = os.path.join(output_dir, f"{keyword}_defs.h")
+            cwd = os.getcwd()
+            defs_file = os.path.join(cwd, f"{keyword}_defs.h")
             with open(defs_file, 'w') as outfile:
                 outfile.write(f"#ifndef {keyword.upper()}_DEFS_H\n")
                 outfile.write(f"#define {keyword.upper()}_DEFS_H\n\n")
@@ -240,7 +241,7 @@ def generate_files(input_file, keyword, output_dir):
             print(f"Generated: {defs_file}")
 
         # Generate tcp.h
-        generate_tcp_h(input_file, keyword, output_dir)
+        generate_tcp_h(input_file, keyword)
 
     except Exception as e:
         print(f"Error generating files: {e}")
@@ -291,13 +292,12 @@ def extract_bictcp_fields_for_test(module_content):
         return []
 
 
-def generate_test_file(input_file, keyword, output_dir):
+def generate_test_file(input_file, keyword):
     """
     Generate a test file that reads a CSV, initializes mock structures,
     and calls the appropriate protocol functions.
     :param input_file: The source file to process.
     :param keyword: The keyword identifying the protocol.
-    :param output_dir: The directory to store the generated test file.
     """
     try:
         # Read the input file to check for the structures used in search_module.c
@@ -321,10 +321,11 @@ def generate_test_file(input_file, keyword, output_dir):
         bictcp_structure += "};\n"
 
         # Create output directory if not exists
-        os.makedirs(output_dir, exist_ok=True)
+        # os.makedirs(output_dir, exist_ok=True)
 
         # Write to test file
-        test_file_path = os.path.join(output_dir, f"{keyword}_test.c")
+        cwd = os.getcwd()
+        test_file_path = os.path.join(cwd, f"{keyword}_test.c")
         with open(test_file_path, 'w') as outfile:
             outfile.write("#include <stdio.h>\n")
             outfile.write("#include <stdlib.h>\n")
@@ -432,15 +433,15 @@ int main(int argc, char *argv[]) {
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:
-        print("Usage: python generate_module.py <input_file> <keyword> <output_dir>")
+        print("Usage: python generate_module.py <input_file> <keyword>")
         sys.exit(1)
 
     input_file = sys.argv[1]
     keyword = sys.argv[2]
-    output_dir = sys.argv[3]
+    # output_dir = sys.argv[3]
 
     # Generate module, defs, and tcp.h files
-    generate_files(input_file, keyword, output_dir)
+    generate_files(input_file, keyword)
 
     # Generate the test file
-    generate_test_file(input_file, keyword, output_dir)
+    generate_test_file(input_file, keyword)

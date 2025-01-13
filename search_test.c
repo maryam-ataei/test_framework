@@ -83,6 +83,7 @@ int main(int argc, char *argv[]) {
         //     printf("    Bin[%d]: %u\n", i, ca->search.bin[i]);
         // }
         // printf("\n");
+
         printf("Line %d:\n", line_number);
         printf("  now_us: %u\n", now_us);
         printf("  bytes_acked: %lu\n", bytes_acked);

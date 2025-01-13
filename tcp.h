@@ -8,13 +8,13 @@
 
 /** Mock implementation of the Linux kernel's tcp_sock structure */
 struct tcp_sock {
+    uint32_t mss_cache; // Simulated mss_cache
     uint32_t snd_ssthresh; // Simulated snd_ssthresh
+    uint32_t tcp_mstamp; // Simulated tcp_mstamp
     uint32_t bytes_acked; // Simulated bytes_acked
     uint32_t lsndtime; // Simulated lsndtime
-    uint32_t snd_nxt; // Simulated snd_nxt
     uint32_t snd_cwnd; // Simulated snd_cwnd
-    uint32_t mss_cache; // Simulated mss_cache
-    uint32_t tcp_mstamp; // Simulated tcp_mstamp
+    uint32_t snd_nxt; // Simulated snd_nxt
 };
 /** Mock implementation of the Linux kernel's sock structure */
 struct sock {
