@@ -22,8 +22,10 @@ def extract_and_modify_search_content(input_file, keyword, output_file):
             r'\bu32\b': 'uint32_t',
             r'\bu64\b': 'uint64_t',
             r'\bs32\b': 'int32_t',
+            r'\bint\b': 'int32_t',
             r'static inline ': '',
             r'static ': '',
+            r'const ': '',
             r'__read_mostly': ''
 
         }

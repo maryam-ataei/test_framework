@@ -35,6 +35,7 @@ The CSV file should have the following columns (in this order):
 - Column 2: bytes_acked - The number of bytes acknowledged.
 - Column 3: mss - The maximum segment size.
 - Column 4: rtt_us - The round-trip time in microseconds.
+
 If the CSV file contains headers, the first line will be skipped.
 
 ## Output
