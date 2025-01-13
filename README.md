@@ -37,7 +37,8 @@ In the original protocol source code, you need to label the section containing t
 protocol_name should be in upper case.
 
 Example:
-
+\
+```c
 // protocol_name_begin
 
   Code that implements the protocol logic
