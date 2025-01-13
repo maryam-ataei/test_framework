@@ -34,6 +34,8 @@ To enable automatic generation, you must label the relevant sections in your ori
 
 In the original protocol source code, you need to label the section containing the core protocol logic using comments.
 
+protocol_name should be in upper case.
+
 Example:
 
 // protocol_name_begin
