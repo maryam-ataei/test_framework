@@ -2,11 +2,6 @@
 #include <string.h>
 #include "search_defs.h"
 
-#define MAX_US_INT 0xffff 
-#define SEARCH_BINS 10		/* Number of bins in a window */
-#define SEARCH_EXTRA_BINS 15 /* Number of additional bins to cover data after shiftting by RTT */
-#define SEARCH_TOTAL_BINS 25 	/* Total number of bins containing essential bins to cover RTT shift */
-
 int32_t search_window_duration_factor  = 35;
 int32_t search_thresh  = 35;
 int32_t cwnd_rollback  = 0;

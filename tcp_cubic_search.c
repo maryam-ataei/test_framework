@@ -86,12 +86,10 @@ MODULE_PARM_DESC(hystart_ack_delta_us, "spacing between ack's indicating train (
  		sudo sh -c "echo '0' > /sys/module/cubic_with_search/parameters/slow_start_mode" 
 */
 // SEARCH_defs_begin
-// SEARCH_begin
 #define MAX_US_INT 0xffff 
 #define SEARCH_BINS 10		/* Number of bins in a window */
 #define SEARCH_EXTRA_BINS 15 /* Number of additional bins to cover data after shiftting by RTT */
 #define SEARCH_TOTAL_BINS 25 	/* Total number of bins containing essential bins to cover RTT shift */
-// SEARCH_end
 // SEARCH_defs_end
 
 /* Define an enum for the slow start mode */

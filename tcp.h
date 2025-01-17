@@ -10,7 +10,6 @@
 struct tcp_sock {
     uint32_t snd_cwnd; // Simulated snd_cwnd
     uint32_t bytes_acked; // Simulated bytes_acked
-    uint32_t lsndtime; // Simulated lsndtime
     uint32_t snd_ssthresh; // Simulated snd_ssthresh
     uint32_t mss_cache; // Simulated mss_cache
     uint32_t tcp_mstamp; // Simulated tcp_mstamp
@@ -29,7 +28,5 @@ struct sock {
 #ifndef max
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #endif
-
-// If additional functions or structures are needed, add them here.
 
 #endif // TCP_H

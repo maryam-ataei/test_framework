@@ -14,12 +14,11 @@ uint64_t search_compute_delivered_window(struct sock *sk, int32_t left, int32_t 
 void search_exit_slow_start(struct sock *sk);
 void search_update(struct sock *sk, uint32_t rtt_us);
 
-// SEARCH_begin
 #define MAX_US_INT 0xffff 
 #define SEARCH_BINS 10		/* Number of bins in a window */
 #define SEARCH_EXTRA_BINS 15 /* Number of additional bins to cover data after shiftting by RTT */
 #define SEARCH_TOTAL_BINS 25 	/* Total number of bins containing essential bins to cover RTT shift */
-// SEARCH_end
+
 
 /* BIC TCP Parameters */
 struct bictcp {
