@@ -102,5 +102,3 @@ int main(int argc, char *argv[]) {
     printf("Finished processing.\n");
     return 0;
 }
-
-// Add function call for the desired protocol, e.g., search_update(sk_ptr, rtt_us);
