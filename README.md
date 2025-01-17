@@ -34,21 +34,41 @@ To enable automatic generation, you must label the relevant sections in your ori
 
 In the original protocol source code, you need to label the section containing the core protocol logic using comments.
 
-Example:
+protocol_name should be in upper case.
 
-`// protocol_name_begin
+Example:
+\
+```c
+// {protocol_name}_begin
+
   Code that implements the protocol logic
-// protocol_name_end`
+  
+// {protocol_name}_end
+```
 
 #### Labeling for Definitions (for search_defs.h):
 
 For function declarations and necessary definitions, label them in your original file as follows:
 
 Example:
+```c
+// {protocol_name}_defs_begin
 
-`// protocol_name_defs_begin
-// Function declarations and other necessary definitions
-// protocol_name_defs_end`
+  Function declarations and other necessary definitions
+
+// {protocol_name}_defs_end
+```
+
+For example for search:
+```c
+\\ SEARCH_begin
+\\ SEARCH_end
+
+\\ SEARCH_defs_begin
+\\ SEARCH_defs_end
+```
+
+
 
 These labeled sections will be extracted and placed in the corresponding generated files.
 
@@ -111,9 +131,13 @@ To run the test, use the following command:
 The CSV file should have the following columns in this order:
 
 Column 1: now_us - The current timestamp in microseconds.
+
 Column 2: bytes_acked - The number of bytes acknowledged.
+
 Column 3: mss - The maximum segment size.
+
 Column 4: rtt_us - The round-trip time in microseconds.
+
 The first line of the CSV file will be skipped if it contains headers.
 
 ## Output
