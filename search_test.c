@@ -38,6 +38,10 @@ int main(int argc, char *argv[]) {
     // Example: bictcp_search_reset(ca);
     bictcp_search_reset(ca);
 
+    tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
+    tp->snd_cwnd = TCP_INIT_CWND;
+    int EXIT_FLAG = 0;
+
     char line[256];
     int line_number = 0;
 
@@ -46,8 +50,9 @@ int main(int argc, char *argv[]) {
     while (fgets(line, sizeof(line), file)) {
         line_number++;
 
-        // Skip the header line
-        if (line_number == 1) {
+        // Skip the header line or lines that start with '#'
+        if (line_number == 1 || line[0] == '#') {
+
             continue;
         }
 
@@ -69,20 +74,10 @@ int main(int argc, char *argv[]) {
         // Call the function or the relevant function for the running protocol
         // Example: search_update(sk_ptr, rtt_us);
         search_update(sk_ptr, rtt_us);
-
-        // Print debug information
-        // Example:
-        // printf("Line %d:\n", line_number);
-        // printf("  now_us: %u\n", now_us);
-        // printf("  bytes_acked: %lu\n", bytes_acked);
-        // printf("  mss: %u\n", mss);
-        // printf("  rtt_us: %u\n", rtt_us);
-        // printf("  Current bin index: %d\n", ca->search.curr_idx);
-        // printf("  Bin values:\n");
-        // for (int i = 0; i < SEARCH_TOTAL_BINS; i++) {
-        //     printf("    Bin[%d]: %u\n", i, ca->search.bin[i]);
-        // }
-        // printf("\n");
+        if ((tp->snd_ssthresh == tp->snd_cwnd) & (EXIT_FLAG == 0)){
+            printf("Exit Slow Start by SEARCH at %u\n", now_us);
+            EXIT_FLAG = 1;
+        }
 
         printf("Line %d:\n", line_number);
         printf("  now_us: %u\n", now_us);
@@ -90,6 +85,9 @@ int main(int argc, char *argv[]) {
         printf("  mss: %u\n", mss);
         printf("  rtt_us: %u\n", rtt_us);
         printf("  Current bin index: %d\n", ca->search.curr_idx);
+        printf("  Bin duration: %d\n", ca->search.bin_duration_us);
+        printf("  Bin end time: %d\n", ca->search.bin_end_us);
+        printf("  Scale factor: %d\n", ca->search.scale_factor);
         printf("  Bin values:\n");
         for (int i = 0; i < SEARCH_TOTAL_BINS; i++) {
             printf("    Bin[%d]: %u\n", i, ca->search.bin[i]);

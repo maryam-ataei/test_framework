@@ -445,4 +445,4 @@ if __name__ == "__main__":
     generate_files(input_file, keyword)
 
     # Generate the test file
-    generate_test_file(input_file, keyword)
+    # generate_test_file(input_file, keyword)
