@@ -3,7 +3,7 @@
  * Automatically Generated Helper Functions
  * ----------------------------------------
  * The following macros and helper functions were automatically generated 
- * by the `generate_module.py` script on 2025-02-17 19:08:11. 
+ * by the `generate_module.py` script on 2025-02-18 15:54:51. 
  *
  * ⚠ WARNING: If you need to add new helper functions specific to your protocol, 
  * define them below. However, rerunning `generate_module.py` will overwrite 
@@ -32,6 +32,7 @@ typedef short                s16;
 typedef int                  s32;
 typedef long long            s64;
 
+
 #define SK_PACING_NONE 0
 #define SK_PACING_NEEDED 1
 #define TCP_CA_Open 0
@@ -50,13 +51,9 @@ static inline u64 div_u64(u64 dividend, u32 divisor) {
     return dividend / divisor;
 }
 
-#define do_div(n, base) ({                  \
-    u32 __base = (base);                    \
-    u32 __rem;                               \
-    __rem = ((u64)(n)) % __base;            /* Get remainder */  \
-    (n) = ((u64)(n)) / __base;              /* Update n with quotient */  \
-    __rem;                                  /* Return remainder */  \
-})
+#define do_div(n, base) ({                                  u32 __base = (base);                                    u32 __rem;                                               __rem = ((u64)(n)) % __base;            /* Get remainder */                  (n) = ((u64)(n)) / __base;              /* Update n with quotient */                  __rem;                                  /* Return remainder */              })
+
+
 
 /* Atomic compare-and-exchange operation */
 #define cmpxchg(ptr, old, new) (__sync_val_compare_and_swap(ptr, old, new))
@@ -70,6 +67,7 @@ static inline u64 div_u64(u64 dividend, u32 divisor) {
 #define NSEC_PER_SEC    1000000000L
 #define FSEC_PER_SEC    1000000000000000LL
 
+
 /* Structure for minmax filtering */
 struct minmax_sample {
     u32 t;
@@ -82,8 +80,8 @@ struct minmax {
 
 static inline u32 minmax_get(const struct minmax *m) {
     return (m->s[0].v > m->s[1].v) ? 
-           ((m->s[0].v > m->s[2].v) ? m->s[0].v : m->s[2].v) :
-           ((m->s[1].v > m->s[2].v) ? m->s[1].v : m->s[2].v);
+            ((m->s[0].v > m->s[2].v) ? m->s[0].v : m->s[2].v) :
+            ((m->s[1].v > m->s[2].v) ? m->s[1].v : m->s[2].v);
 }
 
 static inline void minmax_reset(struct minmax *m, u32 t, u32 meas) {
@@ -107,5 +105,13 @@ static u32 tcp_jiffies32 = 0;
 static inline void update_jiffies() {
     tcp_jiffies32 = get_mock_jiffies();
 }
+
+/* Define a fake placeholder function that compiles but does nothing */
+static inline u32 tcp_min_rtt(const struct tcp_sock *tp) {
+    (void)tp; // Prevents "unused parameter" warnings
+    return 500; // Fake minimum RTT value (adjust if needed)
+}
+
+
 
 #endif /* TCP_HELPER_FUNCTION_H */
