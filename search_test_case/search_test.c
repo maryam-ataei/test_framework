@@ -72,6 +72,7 @@ int main(int argc, char *argv[]) {
     tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
     tp->snd_cwnd = TCP_INIT_CWND;
     int EXIT_FLAG = 0;
+    int LOSS_FLAG = 0;
 
     char line[256];
     int line_number = 0;
@@ -92,11 +93,12 @@ int main(int argc, char *argv[]) {
         // parse the CSV value, and set parsed values to the mock structure.
         // -----------------------------------------------------------------------------
                     
-        u32 now_us, mss, rtt_us;
+        u32 now_us, mss, rtt_us, tp_rate_interval_us, app_limited, tp_delivered_rate, tp_delivered, lost, retrans;
         u64 bytes_acked;
 
         // Parse the CSV line
-        if (sscanf(line, "%u,%llu,%u,%u", &now_us, &bytes_acked, &mss, &rtt_us) != 4) {
+        if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
+                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited) != 10) {
             fprintf(stderr, "Invalid line format at line %d: %s", line_number, line);
             continue;
         }
@@ -105,6 +107,9 @@ int main(int argc, char *argv[]) {
         tp->tcp_mstamp = now_us;
         tp->bytes_acked = bytes_acked;
         tp->mss_cache = mss;
+
+        if (LOSS_FLAG == 0 && lost > 0)
+            LOSS_FLAG = 1;
 
         // Call protocol-specific update functions
         // -----------------------------------------------------------------------------
@@ -128,6 +133,7 @@ int main(int argc, char *argv[]) {
         printf("  bytes_acked: %llu\n", bytes_acked);
         printf("  mss: %u\n", mss);
         printf("  rtt_us: %u\n", rtt_us);
+        printf("  loss happen: %u\n", LOSS_FLAG);
         printf("  Current bin index: %d\n", ca->search.curr_idx);
         printf("  Bin duration: %d\n", ca->search.bin_duration_us);
         printf("  Bin end time: %d\n", ca->search.bin_end_us);

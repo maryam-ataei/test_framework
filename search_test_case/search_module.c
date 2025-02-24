@@ -17,14 +17,15 @@
 */
 
 #include <string.h>
+#include <stdio.h>
 #include "tcp.h"
 #include "search_defs.h"
 #include "tcp_helper_function.h"
 
 int search_window_duration_factor  = 35;
 int search_thresh  = 35;
-int cwnd_rollback  = 0;
-int search_missed_bins_threshold = 2;
+int cwnd_rollback  = 1;
+int search_missed_bins_threshold = 10;
 
 void bictcp_search_reset(struct bictcp *ca)
 {
@@ -239,7 +240,7 @@ void search_update(struct sock *sk, u32 rtt_us)
 
 			if (prev_delv_bytes > 0) {
 				norm_diff = ((2 * prev_delv_bytes) - curr_delv_bytes)*100 / (2 * prev_delv_bytes);
-
+				printf("norm %d\n", norm_diff);
 				/* check for exit condition */
 				if ((2 * prev_delv_bytes) >= curr_delv_bytes && norm_diff >= search_thresh)
 					search_exit_slow_start(sk);
