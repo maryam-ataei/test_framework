@@ -144,6 +144,7 @@ static inline void update_jiffies() {
 }
 
 /* Define a fake placeholder function that compiles but does nothing */
+struct tcp_sock; // Forward declaration
 static inline u32 tcp_min_rtt(const struct tcp_sock *tp) {
     (void)tp; // Prevents "unused parameter" warnings
     return 500; // Fake minimum RTT value (adjust if needed)

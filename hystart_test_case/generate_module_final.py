@@ -3,6 +3,7 @@ import re
 import os
 import datetime
 import textwrap
+from collections import defaultdict
 
 def apply_replacements(content, replacements):
     """Apply type and attribute replacements to the content."""
@@ -231,13 +232,52 @@ def generate_tcp_h(module_file, module_defs_file, output_tcp_h="tcp.h"):
             #define TCP_INFINITE_SSTHRESH   0x7fffffff
         """)
 
-        # Generate structure definitions dynamically
-        struct_definitions = []
+        # Step 1: Build Dependency Graph
+        struct_dependencies = defaultdict(set)
         for struct_name, fields in extracted_fields.items():
-            struct_body = "\n".join([f"    u64 {field};" if " " not in field else f"    {field};" for field in fields])  
+            for field in fields:
+                field_parts = field.split()
+                if not field_parts:  # Skip empty or malformed fields
+                    continue
+
+                field_type = field_parts[0]  # Extract type
+                if field_type.startswith("struct") and len(field_parts) > 1:
+                    dep_struct = field_parts[1]  # Get actual struct name
+
+                    # Ignore congestion control structures in dependency resolution
+                    if dep_struct in cc_structs_used:
+                        continue  
+
+                    if dep_struct in extracted_fields:
+                        struct_dependencies[struct_name].add(dep_struct)
+
+
+
+        # Step 2: Topological Sort (Order Structs Based on Dependencies)
+        sorted_structs = []
+        visited = set()
+
+        def visit(struct):
+            """ Recursively visit dependencies and sort them correctly. """
+            if struct in visited:
+                return
+            visited.add(struct)
+            for dep in struct_dependencies[struct]:
+                visit(dep)
+            sorted_structs.append(struct)
+
+        # Visit all structs in the extracted fields
+        for struct in extracted_fields:
+            visit(struct)
+
+        # Step 3: Generate structure definitions dynamically
+        struct_definitions = []
+        for struct_name in sorted_structs:
+            fields = extracted_fields[struct_name]
+            struct_body = "\n".join([f"    u64 {field};" if " " not in field else f"    {field};" for field in fields])
             struct_definitions.append(f"struct {struct_name} {{\n{struct_body}\n}};\n")
 
-        # Generate detected macros dynamically
+        # Step 4: Generate detected macros dynamically
         macro_definitions = []
         for macro, struct_type in struct_macros.items():
             if struct_type in cc_structs_used:
@@ -266,10 +306,11 @@ def generate_tcp_h(module_file, module_defs_file, output_tcp_h="tcp.h"):
     except Exception as e:
         print(f"Error generating tcp.h: {e}")
 
-############################################# CC_HELPER_FUNCTION.H ###################################################################
+
+############################################# cc_HELPER_FUNCTION.H ###################################################################
 def generate_cc_helper():
     """
-    Generate CC_helper_function.h file with:
+    Generate cc_helper_function.h file with:
     - Kernel-style type definitions (u8, u16, s32, etc.)
     - Inline sequence number comparison functions
     """
@@ -484,7 +525,6 @@ def generate_cc_helper():
                     return 0;
                 return 1 + ((63 - __builtin_clzl(word)) ^ (BITS_PER_LONG - 1));
             }
-
         """)
 
         footer = "\n#endif /* CC_HELPER_FUNCTION_H */\n"
@@ -667,7 +707,6 @@ def generate_test_file(module_file, keyword):
             raise ValueError("Failed to extract necessary test details.")
 
         output_test_file= f"{keyword}_test.c"
-
         # Get current date and time
         current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -744,7 +783,8 @@ int main(int argc, char *argv[]) {{
     // ⚠ USER NOTE: Add your reset function below, if applicable.
     // Example: bictcp_search_reset(ca);
     // -----------------------------------------------------------------------------
-    bictcp_search_reset(ca);            
+    bictcp_reset(ca);
+    bictcp_hystart_reset(sk);            
 
     // Initialize protocol-specific variables
     tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
@@ -781,45 +821,49 @@ int main(int argc, char *argv[]) {{
             continue;
         }}
 
-        // Set parsed values to the mock structure
-        tp->tcp_mstamp = now_us;
-        tp->bytes_acked = bytes_acked;
-        tp->mss_cache = mss;
+        tp->snd_nxt = snd_nxt;
+
+        sk->sk_pacing_rate = 0;
+
+        u32 delay;
+        delay = rtt_us;
+        if (delay == 0)
+            delay = 1;
+
+        /* first time call or link delay decreases */
+        if (ca->delay_min == 0 || ca->delay_min > delay)
+            ca->delay_min = delay;
+
+        if (after(snd_una, ca->end_seq))
+            bictcp_hystart_reset(sk);
 
         // Call protocol-specific update functions
         // -----------------------------------------------------------------------------
         // ⚠ USER NOTE: Call the function(s) to start running your protocol.
         // -----------------------------------------------------------------------------     
-        search_update(sk, rtt_us);
+        // Check if HyStart has exited the SLOW START phase
+        hystart_update(sk, delay);
 
 
         // -----------------------------------------------------------------------------
         // ⚠ USER NOTE: Print results and info based on your requirements.
         // -----------------------------------------------------------------------------
 
-        if ((tp->snd_ssthresh == tp->snd_cwnd) && (EXIT_FLAG == 0)) {{
-            printf("Exit Slow Start at %u\\n", now_us);
+        if (ca->found && EXIT_FLAG == 0) {{
+            printf("HyStart Exits Slow Phase at %u us\\n", now_us);
             EXIT_FLAG = 1;
         }}
 
         // Print details
         printf("Line %d:\\n", line_number);
         printf("  now_us: %u\\n", now_us);
-        printf("  bytes_acked: %llu\\n", bytes_acked);
-        printf("  mss: %u\\n", mss);
-        printf("  rtt_us: %u\\n", rtt_us);
-        printf("  Current bin index: %d\\n", ca->search.curr_idx);
-        printf("  Bin duration: %d\\n", ca->search.bin_duration_us);
-        printf("  Bin end time: %d\\n", ca->search.bin_end_us);
-        printf("  Scale factor: %d\\n", ca->search.scale_factor);
-        printf("  Bin values:\\n");
-
-        for (int i = 0; i < SEARCH_TOTAL_BINS; i++) {{
-            printf("    Bin[%d]: %u\\n", i, ca->search.bin[i]);
-        }}
+        printf("  end_seq: %u\\n", ca->end_seq);
+        printf("  hystart_found: %u\\n", ca->found);
+        printf("  round_start: %u\\n", ca->round_start);
+        printf("  app_limited: %u\\n", app_limited);
+        printf("  loss: %u\\n", lost);
         printf("\\n");
     }}
-
     // Clean up memory
     if (sk->{congestion_control_struct}) {{
         free(sk->{congestion_control_struct});

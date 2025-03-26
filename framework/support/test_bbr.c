@@ -87,12 +87,13 @@ int main(int argc, char *argv[]) {
         // parse the CSV value, and set parsed values to the mock structure.
         // -----------------------------------------------------------------------------
                     
-        u32 now_us, mss, rtt_us, tp_rate_interval_us, app_limited, tp_delivered_rate, tp_delivered, lost, retrans;
+        // Variables to store parsed values
+        u32 now_us, mss, rtt_us, tp_rate_interval_us, app_limited, tp_delivered_rate, tp_delivered, lost, retrans, snd_nxt, sk_pacing_rate;
         u64 bytes_acked;
 
         // Parse the CSV line
-        if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
-                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited) != 10) {
+        if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u, %u, %u", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
+                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate) != 12) {
             fprintf(stderr, "Invalid line format at line %d: %s", line_number, line);
             continue;
         }

@@ -13,8 +13,7 @@
 
 # Variables
 CC = gcc
-# CFLAGS = -Wall -Wextra -Wno-incompatible-pointer-types -Wno-unused-function -Wno-unused-parameter
-CFLAGS = -Wall -Wextra
+CFLAGS = -Wall -Wextra -Wno-incompatible-pointer-types -Wno-unused-function -Wno-unused-parameter
 EXEC = test_search
 SRC = search_module.c test_search.c
 

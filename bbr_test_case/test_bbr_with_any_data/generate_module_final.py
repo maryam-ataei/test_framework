@@ -224,7 +224,7 @@ def generate_tcp_h(module_file, module_defs_file, output_tcp_h="tcp.h"):
             #define TCP_H
 
             #include <stdint.h>
-            #include "tcp_helper_function.h"
+            #include "cc_helper_function.h"
             """)
 
         tcp_needed_definitions = textwrap.dedent("""\
@@ -307,16 +307,16 @@ def generate_tcp_h(module_file, module_defs_file, output_tcp_h="tcp.h"):
         print(f"Error generating tcp.h: {e}")
 
 
-############################################# TCP_HELPER_FUNCTION.H ###################################################################
-def generate_tcp_helper():
+############################################# CC_HELPER_FUNCTION.H ###################################################################
+def generate_cc_helper():
     """
-    Generate tcp_helper_function.h file with:
+    Generate cc_helper_function.h file with:
     - Kernel-style type definitions (u8, u16, s32, etc.)
     - Inline sequence number comparison functions
     """
     try:
 
-        output_file="tcp_helper_function.h" 
+        output_file="cc_helper_function.h" 
 
         # Get current date and time
         current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -341,10 +341,11 @@ def generate_tcp_helper():
                 """)
 
         include_guard = textwrap.dedent("""\
-            #ifndef TCP_HELPER_FUNCTION_H
-            #define TCP_HELPER_FUNCTION_H
+            #ifndef CC_HELPER_FUNCTION_H
+            #define CC_HELPER_FUNCTION_H
 
             #include <stdint.h>
+            #include <stdio.h>
             #include <stdbool.h>
             #include <time.h>
         """)
@@ -364,9 +365,28 @@ def generate_tcp_helper():
 
         # Define sequence number helper functions
         helper_functions = textwrap.dedent("""\
+                        /* Parameters used to convert time values */
+            #define MSEC_PER_SEC    1000L
+            #define USEC_PER_MSEC   1000L
+            #define NSEC_PER_USEC   1000L
+            #define NSEC_PER_MSEC   1000000L
+            #define USEC_PER_SEC    1000000L
+            #define NSEC_PER_SEC    1000000000L
+            #define FSEC_PER_SEC    1000000000000000LL
+
             #define SK_PACING_NONE 0
             #define SK_PACING_NEEDED 1
             #define TCP_CA_Open 0
+            #define HZ  1024
+            #define BITS_PER_LONG 64
+            #define LONG_MAX    ((long)(~0UL >> 1))
+            #define GSO_MAX_SIZE 65536
+            #define LINUX_MIB_TCPHYSTARTTRAINDETECT 0
+            #define LINUX_MIB_TCPHYSTARTTRAINCWND 0
+            #define LINUX_MIB_TCPHYSTARTDELAYCWND 0
+            #define LINUX_MIB_TCPHYSTARTDELAYDETECT 0
+
+            #define sock_net(sk) (NULL)
 
             #define before(seq1, seq2)    ((s32)((seq1) - (seq2)) < 0)
             #define before_eq(seq1, seq2) ((s32)((seq1) - (seq2)) <= 0)
@@ -377,10 +397,38 @@ def generate_tcp_helper():
             #define max(x, y) ((x) > (y) ? (x) : (y))
             #define min_t(type, x, y) ((type)(x) < (type)(y) ? (type)(x) : (type)(y))
 
-            /* Safe inline function for division */
+            #define MAX_JIFFY_OFFSET ((LONG_MAX >> 1)-1)
+
+            /* This forces the compiler to read x only once */
+            #define READ_ONCE(x) (*(volatile typeof(x) *)&(x))
+
+            #define NET_INC_STATS(net, field) do { (void)(net); (void)(field); } while (0)
+            #define NET_ADD_STATS(net, field, value) do { (void)(net); (void)(field); (void)(value); } while (0)
+
+            // Define pr_debug as printf for user-space
+            #ifndef pr_debug
+            #define pr_debug(fmt, ...) printf(fmt, ##__VA_ARGS__)
+            #endif
+
+            #ifndef clamp
+            #define clamp(val, min, max) ((val < min) ? min : (val > max) ? max : val)
+            #endif
+
+            /* unsigned 64bit divide with 32bit divisor */
             static inline u64 div_u64(u64 dividend, u32 divisor) {
                 return dividend / divisor;
             }
+
+            /* Unsigned 64bit divide with 64bit divisor */
+            static inline u64 div64_u64(u64 dividend, u64 divisor) {
+                return dividend / divisor;
+            }
+
+            static inline u32 div64_ul(u64 dividend, u32 divisor)
+            {
+                return (u32)(dividend / divisor);
+            }
+
 
             #define do_div(n, base) ({                  \\
                 u32 __base = (base);                    \\
@@ -393,16 +441,6 @@ def generate_tcp_helper():
 
             /* Atomic compare-and-exchange operation */
             #define cmpxchg(ptr, old, new) (__sync_val_compare_and_swap(ptr, old, new))
-
-            /* Parameters used to convert time values */
-            #define MSEC_PER_SEC    1000L
-            #define USEC_PER_MSEC   1000L
-            #define NSEC_PER_USEC   1000L
-            #define NSEC_PER_MSEC   1000000L
-            #define USEC_PER_SEC    1000000L
-            #define NSEC_PER_SEC    1000000000L
-            #define FSEC_PER_SEC    1000000000000000LL
-
 
             /* Structure for minmax filtering */
             struct minmax_sample {
@@ -480,9 +518,15 @@ def generate_tcp_helper():
             }
 
 
+            static inline int fls64(unsigned long word)
+            {
+                if (word == 0)
+                    return 0;
+                return 1 + ((63 - __builtin_clzl(word)) ^ (BITS_PER_LONG - 1));
+            }
         """)
 
-        footer = "\n#endif /* TCP_HELPER_FUNCTION_H */\n"
+        footer = "\n#endif /* CC_HELPER_FUNCTION_H */\n"
 
         # Combine all parts
         file_content = (
@@ -500,7 +544,7 @@ def generate_tcp_helper():
         print(f"Generated: {output_file}")
 
     except Exception as e:
-        print(f"Error generating tcp_helper_function.h: {e}")
+        print(f"Error generating cc_helper_function.h: {e}")
 
 ############################################# MODULE.C &  MODULE_DEFS.H ###################################################
 def generate_files(input_file, keyword):
@@ -563,7 +607,7 @@ def generate_files(input_file, keyword):
                     #include <string.h>
                     #include "tcp.h"
                     #include "{keyword}_defs.h"
-                    #include "tcp_helper_function.h"
+                    #include "cc_helper_function.h"
         
                     """)
 
@@ -621,7 +665,7 @@ def generate_files(input_file, keyword):
                     #include <stdint.h>
                     #include <string.h>
                     #include "tcp.h"
-                    #include "tcp_helper_function.h"
+                    #include "cc_helper_function.h"
 
                     """)
 
@@ -698,7 +742,7 @@ def generate_test_file(module_file, keyword):
 #include <string.h>
 #include "tcp.h"
 #include "{keyword.lower()}_defs.h"
-#include "tcp_helper_function.h"
+#include "cc_helper_function.h"
 
 int main(int argc, char *argv[]) {{
     if (argc < 2) {{
@@ -767,13 +811,12 @@ int main(int argc, char *argv[]) {{
         // parse the CSV value, and set parsed values to the mock structure.
         // -----------------------------------------------------------------------------
                     
-        // Variables to store parsed values
-        u32 now_us, tp_rate_interval_us, app_limited, tp_delivered_rate, mss, tp_delivered, lost, retrans;
+        u32 now_us, mss, rtt_us, tp_rate_interval_us, app_limited, tp_delivered_rate, tp_delivered, lost, retrans, snd_nxt;
+        u64 bytes_acked;
 
-        // Parse CSV line with ONLY the required variables
-        if (sscanf(line, "%u,%u,%u,%u,%u,%u,%u,%u",
-                &now_us, &tp_rate_interval_us,
-                &app_limited, &mss, &tp_delivered_rate, &tp_delivered, &lost, &retrans) != 8) {{
+        // Parse the CSV line
+        if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
+                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt) != 11) {{
             fprintf(stderr, "Invalid line format at line %d: %s", line_number, line);
             continue;
         }}
@@ -976,7 +1019,7 @@ if __name__ == "__main__":
     generate_files(input_file, keyword)
     if GENERATE_HELPER_FUNC == 1:
         # Run function to generate helping functions
-        generate_tcp_helper()
+        generate_cc_helper()
 
     if GENERATE_TEST_FILE == 1:
         # Generate the test file

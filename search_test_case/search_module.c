@@ -104,6 +104,10 @@ void search_update_bins(struct sock *sk, u32 now_us, u32 rtt_us)
 	/* If passed_bins greater than 1, it means we have some missed bins */
 	passed_bins = ((now_us - ca->search.bin_end_us) / ca->search.bin_duration_us) + 1;
 
+	if (passed_bins > 1 )
+		printf("passed_bins %d\n ", passed_bins);
+
+
 	/* If we passed more than search_missed_bins_threshold bins, need to reset SEARCH, and initialize bins*/
 	if (passed_bins > search_missed_bins_threshold) {
 		bictcp_search_reset(ca);
@@ -240,7 +244,7 @@ void search_update(struct sock *sk, u32 rtt_us)
 
 			if (prev_delv_bytes > 0) {
 				norm_diff = ((2 * prev_delv_bytes) - curr_delv_bytes)*100 / (2 * prev_delv_bytes);
-				printf("norm %d\n", norm_diff);
+				printf("norm %d\n curr_delv %d\n prev_delv %d\n", norm_diff, curr_delv_bytes, prev_delv_bytes);
 				/* check for exit condition */
 				if ((2 * prev_delv_bytes) >= curr_delv_bytes && norm_diff >= search_thresh)
 					search_exit_slow_start(sk);

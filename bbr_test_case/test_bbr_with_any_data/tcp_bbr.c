@@ -1061,9 +1061,10 @@ static void bbr_main(struct sock *sk, const struct rate_sample *rs)
 	
 	////////////////////////////////////////// MARYAM ////////////////////////////////////////////////
 	print_header(sk); 
-	printk(KERN_CONT "[now_ns %llu] [bbr_state %u] [rtt %lu] [cwnd %u] [est_bw %u] [byte_sent %llu] [byte_acked %llu] [loss %u] [total_retrans %u] [retrans %u], [mss %u] [bbr_min_rtt %u] [bbr_full_bw %u] [bbr_full_bw_cnt %u] [bbr_max_bw %u] [delivered %u] [interval %lu] [tp_delv_rate %u] [tp_interval %u] [round_start %u] [app_limited %u]\n",
-	 tp->tcp_clock_cache, bbr->mode, rs->rtt_us, tp->snd_cwnd, bw, tp->bytes_sent, tp->bytes_acked, tp->lost_out, tp->total_retrans, tp->retrans_out, tp->mss_cache, bbr->min_rtt_us, bbr->full_bw, bbr->full_bw_cnt, minmax_get(&bbr->bw), rs->delivered, rs->interval_us, tp->rate_delivered, tp->rate_interval_us, bbr->round_start, rs->is_app_limited);
+	printk(KERN_CONT "[now_ns %llu] [bbr_state %u] [rtt %lu] [byte_acked %llu] [loss %u] [total_retrans %u] [mss %u] [bbr_min_rtt %u] [bbr_full_bw %u] [bbr_full_bw_cnt %u] [bbr_max_bw %u] [tp_delv_rate %u] [tp_interval %u] [round_start %u] [app_limited %u] [snd_nxt %u] [sk_pacing_rate %lu]\n",
+	 tp->tcp_clock_cache, bbr->mode, rs->rtt_us, tp->bytes_acked, tp->lost_out, tp->total_retrans, tp->mss_cache, bbr->min_rtt_us, bbr->full_bw, bbr->full_bw_cnt, minmax_get(&bbr->bw), tp->rate_delivered, tp->rate_interval_us, bbr->round_start, rs->is_app_limited, tp->snd_nxt, sk->sk_pacing_rate);
 	/////////////////////////////////////////////////////////////////////////////////////////////////
+
 }
 
 // BBR_begin

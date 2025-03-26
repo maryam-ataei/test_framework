@@ -1,12 +1,18 @@
 /*
  *****************************************************************************
- * Helper Functions
+ * Automatically Generated Helper Functions
  * ----------------------------------------
- * This file contains helper functions and macros for TCP calculations.
+ * The following macros and helper functions were automatically generated 
+ * by the `generate_module.py` script on 2025-03-03 17:26:37. 
  *
  * ⚠ WARNING: If you need to add new helper functions specific to your protocol, 
- * define them below. However, rerunning `ss_extract.py` will overwrite 
+ * define them below. However, rerunning `generate_module.py` will overwrite 
  * this section unless you disable automatic regeneration.
+ *
+ * ✅ To preserve custom additions, set the `GENERATE_HELPER_FUNC` flag to 0 
+ * in `generate_module.py` before rerunning the script.
+ * Alternatively, you can modify `generate_module.py` to include your 
+ * custom functions directly in the generated output.
  *****************************************************************************
  */
 
@@ -26,6 +32,8 @@ typedef signed char          s8;
 typedef short                s16;
 typedef int                  s32;
 typedef long long            s64;
+
+
 
 /* Parameters used to convert time values */
 #define MSEC_PER_SEC    1000L
@@ -144,7 +152,6 @@ static inline void update_jiffies() {
 }
 
 /* Define a fake placeholder function that compiles but does nothing */
-struct tcp_sock; // Forward declaration
 static inline u32 tcp_min_rtt(const struct tcp_sock *tp) {
     (void)tp; // Prevents "unused parameter" warnings
     return 500; // Fake minimum RTT value (adjust if needed)

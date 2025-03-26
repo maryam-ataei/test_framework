@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     // -----------------------------------------------------------------------------
     // ⚠ USER NOTE: Add your reset function below, if applicable.
     // -----------------------------------------------------------------------------
-    bictcp_search_reset(ca);            
+    bictcp_search_reset(ca, UNSET_BIN_DURATION_FALSE);           
 
     // Initialize protocol-specific variables
     tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
@@ -100,6 +100,7 @@ int main(int argc, char *argv[]) {
         tp->tcp_mstamp = now_us;
         tp->bytes_acked = bytes_acked;
         tp->mss_cache = mss;
+        tp->app_limited = app_limited;
 
         if (LOSS_FLAG == 0 && lost > 0)
             LOSS_FLAG = 1;
@@ -137,6 +138,11 @@ int main(int argc, char *argv[]) {
             printf("    Bin[%d]: %u\n", i, ca->search.bin[i]);
         }
         printf("\n");
+
+        if (LOSS_FLAG == 1) {
+            printf("Loss detected at line %d, stopping test.\n", line_number);
+            break;  // Exit the loop immediately when loss happens!
+        }
     }
 
     // Clean up memory

@@ -24,7 +24,7 @@
 int search_window_duration_factor  = 35;
 int search_thresh  = 35;
 int cwnd_rollback  = 0;
-int search_alpha = 13;
+int search_alpha = 2;
 
 void bictcp_search_reset(struct bictcp *ca, enum unset_bin_duration flag)
 {
@@ -134,7 +134,6 @@ void search_update_bins(struct sock *sk, u32 now_us, u32 rtt_us)
 	*/
 	if (tp->app_limited) {
 		bictcp_search_reset(ca, UNSET_BIN_DURATION_TRUE); 
-		search_init_bins(sk, now_us, rtt_us);
 		printf("app limited, reset search: %d\n ",tp->app_limited);
 		return;
 	}
@@ -160,15 +159,14 @@ void search_update_bins(struct sock *sk, u32 now_us, u32 rtt_us)
 	 */
 	initial_rtt = ca->search.bin_duration_us * SEARCH_BINS * 10 / search_window_duration_factor;
 	if (passed_bins > search_alpha * (initial_rtt / ca->search.bin_duration_us)) { 
-		printf("reset by missed_bins: alpha %d\n ", search_alpha);
-		bictcp_search_reset(ca, UNSET_BIN_DURATION_FALSE);
-		// if (passed_bins > SEARCH_BINS){
-			// bictcp_search_reset(ca, UNSET_BIN_DURATION_FALSE);
-		// } else {
-		// 	bictcp_search_reset(ca, UNSET_BIN_DURATION_TRUE);
-		// }
-	    search_init_bins(sk, now_us, rtt_us);
-	    return;
+
+		if (passed_bins > SEARCH_BINS){
+			bictcp_search_reset(ca, UNSET_BIN_DURATION_FALSE);
+		} else {
+			bictcp_search_reset(ca, UNSET_BIN_DURATION_TRUE);
+		}
+	    	search_init_bins(sk, now_us, rtt_us);
+	    	return;
 	}
 
 
