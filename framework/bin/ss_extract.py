@@ -39,18 +39,19 @@ def generate_test_files(keyword):
 
     except Exception as e:
         print(f"Error: {e}")
-
-if __name__ == "__main__":
-    # Create argument parser
-    parser = argparse.ArgumentParser(description="Extracts information from the input file and generates required files.")
-
-    # Add arguments
-    parser.add_argument("-f", "--file", required=True, help="Path to the input file")
-    parser.add_argument("-k", "--keyword", required=True, help="Keyword to use for processing")
+        
+def main():
+    """Main function to handle command-line argument for keyword."""
+    # Set up argument parsing
+    parser = argparse.ArgumentParser(description="Generate test files from the support folder.")
+    
+    parser.add_argument("-k", "--keyword", required=True, help="The keyword used for generating test file (e.g., 'SEARCH').")
 
     # Parse arguments
     args = parser.parse_args()
 
-    # Run functions with parsed arguments
-    generate_files(args.file, args.keyword)
-    generate_makefile(args.keyword)
+    # Generate the necessary test files
+    generate_test_files(args.keyword)
+
+if __name__ == "__main__":
+    main()
