@@ -503,16 +503,18 @@ run: $(EXEC)
 
 
 ############################################# MAIN ###################################################################
+def main():
+    """Main function to handle command-line argument for keyword."""
+    # Set up argument parsing
+    parser = argparse.ArgumentParser(description="Generate test files from the support folder.")
+    
+    parser.add_argument("-k", "--keyword", required=True, help="The keyword used for generating test file (e.g., 'SEARCH').")
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Generate the necessary test files
+    generate_test_files(args.keyword)
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python generate_module.py <input_file> <keyword>")
-        sys.exit(1)
-
-    input_file = sys.argv[1]
-    keyword = sys.argv[2]
-
-    # Generate module, defs, and tcp.h files
-    generate_files(input_file, keyword)
-
-    # Run the function to generate the Makefile
-    generate_makefile(keyword)
+    main()
