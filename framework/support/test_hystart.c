@@ -75,6 +75,9 @@ int main(int argc, char *argv[]) {
 
     printf("Processing CSV input: %s\n\n", argv[1]);
 
+    u64 initial_seq = 0;
+    u64 first_seq = 0;
+
     while (fgets(line, sizeof(line), file)) {
         line_number++;
 
@@ -100,18 +103,56 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        /* Update the TCP socket state with the current input values */
         tp->snd_nxt = snd_nxt;
         sk->sk_pacing_rate = sk_pacing_rate;
 
+        /* Use RTT sample from input; ensure non-zero delay 
+         *  (avoid divide-by-zero or meaningless results)
+         */
         u32 delay;
         delay = rtt_us;
         if (delay == 0)
             delay = 1;
 
+        /* Update the minimum observed delay for HyStart */
         /* first time call or link delay decreases */
         if (ca->delay_min == 0 || ca->delay_min > delay)
             ca->delay_min = delay;
 
+        /* 
+         * Initialize the connection state during the first data row.
+         * Estimate the initial sequence number based on snd_nxt and number of sent segments.
+         * - Assumes 11 segments (e.g., based on sent packet=11 at the time of first ack).
+         * - Sets initial_seq for later ACK sequence tracking.
+         * - Sets first_ack_seq for HyStart cwnd comparison.
+         * - Sets ca->end_seq as the expected boundary for the current round.
+         */
+        if (line_number == 2 && line[0] != '#') {
+            initial_seq = snd_nxt - (11 * mss);
+            first_ack_seq = snd_nxt;
+            ca->end_seq = snd_nxt;
+        }
+
+        /*
+         * Compute the current ACKed sequence number using initial_seq and cumulative bytes_acked.
+         * This sequence number is used to track round boundaries.
+         */
+        u64 ack;
+        ack_seq = bytes_acked + initial_seq;
+
+        /*
+         * Check if this ACK marks the end of the current HyStart round.
+         * If so, reset the round state using bictcp_hystart_reset(), which sets a new end_seq.
+         */
+        if (after(ack_seq, ca->end_seq)) {
+            bictcp_hystart_reset(sk);
+        }
+
+        /*
+         * Detect and flag the presence of packet loss during the flow.
+         * Only set LOSS_FLAG once (when loss is first seen).
+         */
         if (LOSS_FLAG == 0 && lost > 0)
             LOSS_FLAG = 1;
         
@@ -119,7 +160,7 @@ int main(int argc, char *argv[]) {
         // -----------------------------------------------------------------------------
         // ⚠ USER NOTE: Call the function(s) to start running your protocol.
         // -----------------------------------------------------------------------------     
-        // Check if HyStart has exited the SLOW START phase
+        /* Trigger HyStart */
         hystart_update(sk, delay);
 
         // -----------------------------------------------------------------------------
@@ -135,6 +176,9 @@ int main(int argc, char *argv[]) {
         printf("Line %d:\n", line_number);
         printf("  now_us: %u\n", now_us);
         printf("  end_seq: %u\n", ca->end_seq);
+        printf("  delay_min: %u\n", ca->delay_min);
+        printf("  sample_count: %u\n", ca->sample_cnt);
+        printf("  curr_rtt: %u\n", ca->curr_rtt);
         printf("  hystart_found: %u\n", ca->found);
         printf("  round_start: %u\n", ca->round_start);
         printf("  app_limited: %u\n", app_limited);
