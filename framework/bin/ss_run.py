@@ -40,22 +40,21 @@ def process_input_files(input_folder, output_folder, keyword):
     except Exception as e:
         print(f"Error processing files: {e}")
 
+
 def main():
     """Main function to handle command-line argument parsing."""
     # Set up argument parsing
     parser = argparse.ArgumentParser(description="Run tests for all .csv files in the input folder.")
-    parser.add_argument("keyword", help="The keyword used for the test (e.g., 'SEARCH').")
-    parser.add_argument("input_folder", help="The folder containing the input .csv files.")
-    parser.add_argument("output_folder", help="The folder to save the output .txt files.")
-    
+
+    parser.add_argument("-k", "--keyword", required=True, help="The keyword used for the test (e.g., 'SEARCH').")
+    parser.add_argument("-i", "--input_folder", required=True, help="The folder containing the input .csv files.")
+    parser.add_argument("-o", "--output_folder", required=True, help="The folder to save the output .txt files.")
+
+    # Parse arguments
     args = parser.parse_args()
 
-    keyword = args.keyword
-    input_folder = args.input_folder
-    output_folder = args.output_folder
-
     # Process the input files and generate output files
-    process_input_files(input_folder, output_folder, keyword)
+    process_input_files(args.input_folder, args.output_folder, args.keyword)
 
 if __name__ == "__main__":
     main()
