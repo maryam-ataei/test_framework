@@ -503,7 +503,7 @@ run: $(EXEC)
 
 
 ############################################# MAIN ###################################################################
-if __name__ == "__main__":
+def main():
     # Create argument parser
     parser = argparse.ArgumentParser(description="Extracts information from the input file and generates required files.")
 
@@ -517,3 +517,6 @@ if __name__ == "__main__":
     # Run functions with parsed arguments
     generate_files(args.file, args.keyword)
     generate_makefile(args.keyword)
+    
+if __name__ == "__main__":
+    main()

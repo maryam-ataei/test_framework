@@ -5,7 +5,11 @@ import os
 alpha_values = [0.5] + list(range(1, 14))
 source_file = 'test_dir/search_module.c'
 make_dir = 'test_dir'
+<<<<<<< HEAD
 input_dir = 'searchv3.1_test_dir/input_4g_cubic_tsogro_off/'
+=======
+input_dir = 'searchv3.1_test_dir/input_4g_cubic'
+>>>>>>> keep_my_clean_commit
 run_script = 'python bin/ss_run.py'
 kernel_name = 'search'
 
@@ -29,7 +33,11 @@ for alpha in alpha_values:
     print("✅ Compiled with alpha =", alpha)
 
     # 3. Run the test
+<<<<<<< HEAD
     output_dir = f"alpha{alpha}/output_4g_cubic_tsogro_off_noapplimited_reset"
+=======
+    output_dir = f"alpha{alpha}/output_4g_cubic_new_no_applimited_reset"
+>>>>>>> keep_my_clean_commit
     run_cmd = f"{run_script} -i {input_dir} -o {output_dir} -k {kernel_name}"
     subprocess.run(run_cmd.split())
     print(f"🚀 Finished run for alpha = {alpha}, output to {output_dir}")
