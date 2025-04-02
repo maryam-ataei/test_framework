@@ -4,6 +4,7 @@ import os
 import datetime
 import textwrap
 from collections import defaultdict
+import argparse
 
 def apply_replacements(content, replacements):
     """Apply type and attribute replacements to the content."""
