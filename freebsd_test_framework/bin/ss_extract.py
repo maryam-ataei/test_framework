@@ -479,7 +479,7 @@ def main():
 
     # Run functions with parsed arguments
     generate_files(args.file, args.keyword)
-    # generate_makefile(args.keyword)
+    generate_makefile(args.keyword)
     
 if __name__ == "__main__":
     main()

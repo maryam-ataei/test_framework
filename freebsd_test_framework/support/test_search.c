@@ -23,6 +23,8 @@
 #include "cc_newreno_search.h"
 #include "cc_helper_function.h"
 
+uint64_t mock_now_us = 0;  // Global definition for use in all modules
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <input.csv>\n", argv[0]);
@@ -55,11 +57,11 @@ int main(int argc, char *argv[]) {
     // Initialize protocol-specific variables
     tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
     tp->snd_cwnd = V_tcp_initcwnd_segments;
-    int EXIT_FLAG = 0;
-    int LOSS_FLAG = 0;
 
     char line[512];
     int line_number = 0;
+
+    int64_t pre_byte_ack = 0;
 
     printf("Processing CSV input: %s\n\n", argv[1]);
 
@@ -76,8 +78,8 @@ int main(int argc, char *argv[]) {
         // parse the CSV value, and set parsed values to the mock structure.
         // -----------------------------------------------------------------------------
         // Variables to store parsed values
-        u32 now_us, mss, rtt_us, tp_rate_interval_us, app_limited, tp_delivered_rate, tp_delivered, lost, retrans, snd_nxt, sk_pacing_rate;
-        u64 bytes_acked;
+        int32_t now_us, mss, rtt_us, tp_rate_interval_us, app_limited, tp_delivered_rate, tp_delivered, lost, retrans, snd_nxt, sk_pacing_rate;
+        int64_t bytes_acked;
 
         // Parse the CSV line
         if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u, %u, %u", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
@@ -90,7 +92,8 @@ int main(int argc, char *argv[]) {
         mock_now_us = now_us;
         tp->t_srtt = (rtt_us << TCP_RTT_SHIFT) / tick;
         tp->t_maxseg = mss;
-        ccv.bytes_this_ack = bytes_acked;
+        ccv.bytes_this_ack = bytes_acked - pre_byte_ack;
+        pre_byte_ack = bytes_acked;
 
         if (LOSS_FLAG == 0 && lost > 0)
             LOSS_FLAG = 1;
@@ -99,7 +102,7 @@ int main(int argc, char *argv[]) {
         // -----------------------------------------------------------------------------
         // ⚠ USER NOTE: Call the function(s) to start running your protocol.
         // -----------------------------------------------------------------------------     
-        search_update(ccv);
+        search_update(&ccv);
 
         // -----------------------------------------------------------------------------
         // ⚠ USER NOTE: Print results and info based on your requirements.
@@ -109,6 +112,34 @@ int main(int argc, char *argv[]) {
             printf("Exit Slow Start at %u\n", now_us);
             EXIT_FLAG = 1;
         }
+
+
+        // Print details
+        printf("Line %d:\n", line_number);
+        printf("  now_us: %u\n", now_us);
+        printf("  bytes_acked: %llu\n", bytes_acked);
+        printf("  mss: %u\n", mss);
+        printf("  rtt_us: %u\n", rtt_us);
+        printf("  scaled_srtt_us: %u\n", tp->t_srtt);
+        printf("  loss happen: %u\n", LOSS_FLAG);
+        printf("  Current bin index: %d\n", nreno->search_curr_idx);
+        printf("  Bin duration: %d\n", nreno->search_bin_duration_us);
+        printf("  Bin end time: %d\n", nreno->search_bin_end_us);
+        printf("  Scale factor: %d\n", nreno->search_scale_factor);
+        // printf("  tp_delivered_rate: %d\n", tp_delivered_rate);
+        // printf("  tp_interval_us: %d\n", tp_rate_interval_us);
+
+        printf("  Bin values:\n");
+
+        for (int i = 0; i < SEARCH_TOTAL_BINS; i++) {
+            printf("    Bin[%2d]: %u\n", i, nreno->search_bin[i]);
+        }
+        printf("\n");
+
+        // if (LOSS_FLAG == 1) {
+        //     printf("Loss detected at line %d, stopping test.\n", line_number);
+        //     break;  // Exit the loop immediately when loss happens!
+        // }
     }
 
     // Cleanup

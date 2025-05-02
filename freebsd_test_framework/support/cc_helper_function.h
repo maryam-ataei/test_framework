@@ -16,14 +16,15 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <cc.h>
+#include "cc.h"
 
 #define TCP_RTT_SHIFT       5   /* shift for srtt; 5 bits frac. */
 #define tick 1000000  // Or another appropriate value depending on your model
 #define V_tcp_initcwnd_segments 10
 #define TCP_INFINITE_SSTHRESH    0x7fffffff
 
-static uint64_t mock_now_us = 0;  // you can set this from your test harness
+extern uint64_t mock_now_us;
+
 
 // Override getmicrouptime using mock_now_us from test input
 static inline void getmicrouptime(struct timeval *tv) {
