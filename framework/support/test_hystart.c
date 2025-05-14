@@ -76,7 +76,8 @@ int main(int argc, char *argv[]) {
     printf("Processing CSV input: %s\n\n", argv[1]);
 
     u64 initial_seq = 0;
-    u64 first_seq = 0;
+    u64 first_ack_seq = 0;
+    u64 ack_seq = 0;
 
     while (fgets(line, sizeof(line), file)) {
         line_number++;
@@ -138,7 +139,7 @@ int main(int argc, char *argv[]) {
          * Compute the current ACKed sequence number using initial_seq and cumulative bytes_acked.
          * This sequence number is used to track round boundaries.
          */
-        u64 ack;
+        
         ack_seq = bytes_acked + initial_seq;
 
         /*
