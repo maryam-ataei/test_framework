@@ -2,3 +2,66 @@
 This is the first version of the Test Framework, designed to test the functionality of the slow start algorithm using a mock implementation. The framework processes input data from a CSV file and runs the test on the data and exports the outputs in a text file.
 
 ![Test Framework](framework_image.png)
+
+
+# 📦 Repository Structure: `test_framework`
+
+This framework supports testing and comparing congestion control algorithms like HyStart, BBR, and SEARCH variants. It provides automation for modifying, compiling, and evaluating TCP behavior under various configurations.
+
+---
+
+## 🔹 `framework/` – Test Framework for Linux-based Simulations
+
+Organized to automate testing with different TCP source files and alpha tuning values.
+
+- `bin/`: Contains core automation scripts (detailed below).
+- `support/`: Helper utilities and configuration files.
+- `original cc files with labels/`: Stores original congestion control source files that are labeled for each CC test (BBR, HyStart, SEARCH)
+- `change_alpha_test.py`:  
+  Automates compilation and testing for multiple `search_alpha` values.
+  - Edits `search_module.c`
+  - Rebuilds and runs test pipeline
+  - Stores output in per-alpha folders
+
+---
+
+## 🔹 `freebsd_test_framework/` – Test Framework for FreeBSD-based Simulations
+Module focused on testing NewReno with SEARCH enhancements.
+
+- `bin/`, `support/`: Same structure as `framework/`
+- `cc_newreno_search.c`, `cc_newreno_search.h`: original cc files with labels
+---
+
+## 🧪 Core Utility Scripts (`bin/`)
+
+These Python scripts automate preparation, simulation execution, and source extraction.
+
+---
+
+### 📄 `ss_setup.py`
+**Purpose**:  
+Prepares the test environment by copying support and test files into `test_dir/`.
+
+**Functionality**:
+- Copies `cc_helper_function.h` and `test_<keyword>.c` into `test_dir/`
+- Falls back to using `test_base.c` if `test_<keyword>.c` does not exist
+
+**Usage**:
+```bash
+python3 ss_setup.py -k SEARCH
+
+
+### 📄 `ss_run.py`
+
+**Purpose**:  
+Runs the compiled test binary (`test_<keyword>`) on all `.csv` trace files in the input folder.
+
+**Functionality**:
+- Verifies that the binary `test_<keyword>` exists in `test_dir/`
+- For each input `.csv` file:
+  - Executes the test binary
+  - Redirects the output to a `.txt` file in the output folder
+
+**Usage**:
+```bash
+python3 ss_run.py -k SEARCH -i input_dir -o output_dir
