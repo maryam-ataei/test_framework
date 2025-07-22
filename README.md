@@ -15,9 +15,9 @@ This framework supports testing and comparing congestion control algorithms like
 Organized to automate testing with different TCP source files and alpha tuning values.
 
 - `bin/`: Contains core automation scripts (detailed below).
-- `support/`: Helper utilities and configuration files.
+- `support/`: Helper utilities and test files. If the related CC test file does not exist, we can use test_base.c file to customize it for related CC test.
 - `original cc files with labels/`: Stores original congestion control source files that are labeled for each CC test (BBR, HyStart, SEARCH)
-- `change_alpha_test.py`:  
+- `change_alpha_test.py` -- just for SEARCH algorithm:  
   Automates compilation and testing for multiple `search_alpha` values.
   - Edits `search_module.c`
   - Rebuilds and runs test pipeline
