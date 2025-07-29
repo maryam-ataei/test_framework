@@ -31,14 +31,13 @@ ANALYSIS_PCAP_FILE = True
 ANALYSIS_LOG_CSV = True
 
 cwd = os.getcwd()
-base_path = os.path.join(cwd, "search_test/all_data/alpha_data/desktop_fios_wireless_no_app_limited_profhome")
-pcap_csv_path = os.path.join(cwd, "search_test/all_data/alpha_data/pcap_desktop_fios_wireless_profhome")
-log_csv_path = os.path.join(cwd, "search_test/all_data/alpha_data/log_desktop_fios_wireless_profhome_search/log_search/")
-
-fig_path = os.path.join(cwd, "search_test/all_data/alpha_data/fig_desktop_fios_wireless_profhome")
+base_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/4g_office/both_data/data/output_4g_office_off_alpha200")
+pcap_csv_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/4g_office/both_data/data/pcap_server")
+log_csv_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/4g_office/both_data/data/log_cubic/")
+fig_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/4g_office/figs_for_diff_alpha_new")
 os.makedirs(fig_path, exist_ok=True)
 
-config_output = "output_search"
+config_output = None
 
 ############################### Functions #########################################
 def get_data(file_path):
@@ -246,7 +245,7 @@ def calculate_delivery_rate_per_ack(bytes_acked, now, rtt):
     if delivery_rates:
         return delivery_rates, start_index, time_cal_delv_rates
     else:
-        return None
+        return [], start_index, []
 
 
 def extract_number(folder_name):
@@ -324,7 +323,10 @@ if SEARCH_RESULT:
             folder_names.append(folder)
 
             # Define the full path for the subdirectory (if applicable)
-            subfolder_path = os.path.join(folder_path, config_output)
+            if config_output is not None:
+                subfolder_path = os.path.join(folder_path, config_output)
+            else:
+                subfolder_path = folder_path
             #figures_path for subfolder
             fig_subfolder_path = os.path.join(fig_path, folder)
             os.makedirs(fig_subfolder_path, exist_ok=True)
@@ -409,8 +411,8 @@ if SEARCH_RESULT:
                     analysed_files -= 1
                     continue
                 
-                # if num not in [4, 5, 7, 8, 10, 14, 17, 27, 28]:
-                #     continue
+                if num in [15, 38]:
+                    continue
 
                     
                 print(f"Processing file: log_data_testframework{num+1}.txt")
@@ -638,9 +640,14 @@ if SEARCH_RESULT:
                             delivered_rate_at_loss_based_log = None
 
                         if exit_time:
-                            index_exit = np.where(np.asarray(time_log) >= exit_time)[0][0]
-                            if index_exit:
-                                delivered_rate_at_exit_based_log = tp_delivery_rate_all.iloc[index_exit] #Mb/s
+                            index_exit = np.where(np.asarray(time_log) >= exit_time)
+                            if len(index_exit) > 0:
+                                index_exit_ = index_exit[0]
+                            else:
+                                index_exit_ = None
+                            if len(index_exit_) > 0:
+                                index_exit_ = index_exit_[0]
+                                delivered_rate_at_exit_based_log = tp_delivery_rate_all.iloc[index_exit_] #Mb/s
                             else:
                                 delivered_rate_at_exit_based_log = None
                         else:
@@ -652,6 +659,291 @@ if SEARCH_RESULT:
                         delivery_rate_at_loss_based_log.append(delivered_rate_at_loss_based_log)
                         delivery_rate_exit_based_log.append(delivered_rate_at_exit_based_log)
                         max_delivery_rate_based_log.append(max_delivered_rate_based_log)
+
+
+                    csv_log_file_all = os.path.join(log_csv_path, f"log_data{num+1}.csv")
+                    if os.path.exists(csv_log_file_all):
+                        df_log_all = pd.read_csv(csv_log_file_all)
+
+                        whole_time_log_all = df_log_all["now_us"] * 1e-6 # s
+                        whole_rtt_log_all = df_log_all["rtt_us"] * 1e-6 # s
+                        total_bytes_sent = df_log_all["total_sent_B"] * 1e-6 # Convert to MB
+                        total_bytes_acked = df_log_all["total_delv_B"] * 1e-6 # Convert to MB
+
+
+                        # plot total_sent_bytes and total_delv_bytes on one graph
+                        plt.figure(figsize=(8,6))
+                        plt.plot(whole_time_log_all, total_bytes_sent, marker = 'o', label="Total Sent Bytes", color="b")
+                        plt.plot(whole_time_log_all, total_bytes_acked, marker = 'o', label="Total Delivered Bytes", color="g")
+                        if exit_time:
+                            plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
+                        if loss_time:
+                            plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
+                        if exit_time and loss_time:
+                            max_event = max(exit_time, loss_time)
+                            plt.xlim(0, max_event + 0.1) 
+                            y_val = np.where(whole_time_log_all <= max_event)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(0, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        plt.xlabel("Time (s)", fontsize=18)
+                        plt.ylabel("MBytes", fontsize=18)
+                        plt.title(f"Total Sent and Delivered Bytes - {folder}", fontsize=12)
+                        plt.xticks(fontsize=14)
+                        plt.yticks(fontsize=14)
+                        plt.legend(fontsize=14)
+                        plt.savefig(os.path.join(fig_subfolder_path, f"total_sent_delivered_bytes_{num+1}.png"))
+                        plt.close()
+
+                        # set the time of total_bytes_sent in the next rtt
+                        time_shifted_next_rtt = whole_time_log_all + whole_rtt_log_all 
+
+                        # plot total_sent_bytes and total_delv_bytes in next rtt
+                        plt.figure(figsize=(8,6))
+                        plt.plot(time_shifted_next_rtt, total_bytes_sent, marker = 'o', label="Total Sent Bytes (shifted)", color="b")
+                        plt.plot(whole_time_log_all, total_bytes_acked, marker = 'o', label="Total Delivered Bytes", color="g")  
+                        if exit_time:
+                            plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
+                        if loss_time:
+                            plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
+                        if exit_time and loss_time:
+                            max_event = max(exit_time, loss_time)
+                            plt.xlim(0, max_event + 0.1) 
+                            y_val = np.where(time_shifted_next_rtt <= max_event)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(0, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        plt.xlabel("Time (s)", fontsize=18)
+                        plt.ylabel("MBytes", fontsize=18)
+                        plt.title(f"Total Sent and Delivered Bytes (time shifted to next RTT) - {folder}", fontsize=12)
+                        plt.xticks(fontsize=14)
+                        plt.yticks(fontsize=14)
+                        plt.legend(fontsize=14)
+                        plt.savefig(os.path.join(fig_subfolder_path, f"total_sent_delivered_bytes_next_rtt_{num+1}.png"))
+                        plt.close()
+
+
+                        # interpolated_delivered_next_rtt = np.interp(
+                        #     time_shifted_next_rtt,
+                        #     whole_time_log_all,
+                        #     total_bytes_acked
+                        # )
+
+
+                        # norm_diff_with_delv_shif = (total_bytes_sent - interpolated_delivered_next_rtt) / total_bytes_sent
+                        # norm_diff_with_delv_shif[norm_diff_with_delv_shif < 0] = 0
+                        
+                        # # Mask: only use times where t + RTT >= start of time log
+                        # valid_mask = time_shifted_next_rtt >= whole_time_log_all.iloc[0]
+                        # valid_times = whole_time_log_all[valid_mask]
+                        # valid_norm_diff_delv_shifted_back = norm_diff_with_delv_shif[valid_mask]
+
+                        # # Plot
+                        # plt.figure(figsize=(8, 6))
+                        # plt.plot(valid_times, valid_norm_diff_delv_shifted_back, marker = 'o', color="m", label="Normalized Difference")
+                        # if exit_time:
+                        #     plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
+                        # if loss_time:
+                        #     plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
+
+                        # if exit_time and loss_time:
+                        #     max_event = max(exit_time, loss_time)
+                        #     plt.xlim(0, max_event + 0.1) 
+                        #     y_val = np.where(valid_times <= max_event)[0]
+                        #     if len(y_val) > 0:
+                        #         plt.ylim(0, max(valid_norm_diff_delv_shifted_back[y_val[-1]], 0.35) + 0.05)
+                        # plt.axhline(y=0.35, color='lightgray', linestyle='--', label='Threshold')
+                        # plt.xlabel("Time (s)", fontsize=18)
+                        # plt.ylabel("Normalized Difference", fontsize=18)
+                        # plt.title(f"Normalized Difference Between Sent(t+RTT) and Delivered(t) - {folder}", fontsize=12)
+                        # plt.xticks(fontsize=14)
+                        # plt.yticks(fontsize=14)
+                        # plt.legend(fontsize=14)
+                        # plt.savefig(os.path.join(fig_subfolder_path, f"norm_diff_total_sent_delivered_bytes_{num+1}_delv_shifted_back.png"))
+                        # plt.close()
+                        
+                        # Shift time to t - RTT
+                        time_shifted_prev_rtt = whole_time_log_all - whole_rtt_log_all
+
+                        # plot sent bytes and shifted delivered bytes to pre RTT
+                        plt.figure(figsize=(8,6))
+                        plt.plot(whole_time_log_all, total_bytes_sent, marker = 'o', label="Total Sent Bytes", color="b")
+                        plt.plot(time_shifted_prev_rtt, total_bytes_acked, marker = 'o', label="Total Delivered Bytes (shifted back)", color="g")
+                        if exit_time:
+                            plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
+                        if loss_time:
+                            plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
+                        if exit_time and loss_time:
+                            max_event = max(exit_time, loss_time)
+                            plt.xlim(0, max_event + 0.1) 
+                            y_val = np.where(time_shifted_prev_rtt <= max_event)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(0, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        plt.xlabel("Time (s)", fontsize=18)
+                        plt.ylabel("MBytes", fontsize=18)
+                        plt.title(f"Total Sent and Delivered Bytes (time shifted to previous RTT) - {folder}", fontsize=12)
+                        plt.xticks(fontsize=14)
+                        plt.yticks(fontsize=14)
+                        plt.legend(fontsize=14)
+                        plt.savefig(os.path.join(fig_subfolder_path, f"total_sent_delivered_bytes_prev_rtt_{num+1}.png"))
+                        plt.close()
+
+
+                        # Interpolate sent bytes at time t - RTT
+                        interpolated_sent_prev_rtt = np.interp(
+                            time_shifted_prev_rtt,
+                            whole_time_log_all,
+                            total_bytes_sent
+                        )
+
+                        # Compute normalized difference
+                        norm_diff = (interpolated_sent_prev_rtt - total_bytes_acked) / interpolated_sent_prev_rtt
+                        norm_diff[norm_diff < 0] = 0
+
+                        # Mask: only use times where t - RTT >= start of time log
+                        valid_mask = time_shifted_prev_rtt >= whole_time_log_all.iloc[0]
+                        valid_times = whole_time_log_all[valid_mask]
+                        valid_norm_diff = norm_diff[valid_mask]
+                        valid_byte_sent_pre_rtt = interpolated_sent_prev_rtt[valid_mask]
+
+                        
+                        # Plot
+                        plt.figure(figsize=(8, 6))
+                        plt.plot(valid_times, valid_norm_diff, marker = 'o', color="m", label="Normalized Difference")
+                        if exit_time:
+                            plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
+                        if loss_time:
+                            plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
+                        if exit_time and loss_time:
+                            max_event = max(exit_time, loss_time)
+                            plt.xlim(0, max_event + 0.1) 
+                            y_val = np.where(valid_times <= max_event)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(0, max(valid_norm_diff[y_val[-1]], 0.35) + 0.05)
+                        plt.axhline(y=0.35, color='lightgray', linestyle='--', label='Threshold')
+                        plt.xlabel("Time (s)", fontsize=18)
+                        plt.ylabel("Normalized Difference", fontsize=18)
+                        plt.title(f"Normalized Difference Between Sent(t-RTT) and Delivered(t) - {folder}", fontsize=12)
+                        plt.xticks(fontsize=14)
+                        plt.yticks(fontsize=14)
+                        plt.legend(fontsize=14)
+                        plt.savefig(os.path.join(fig_subfolder_path, f"norm_diff_total_sent_delivered_bytes_{num+1}.png"))
+                        plt.close()
+
+
+                        # plot delivered bytes and interpolated sent bytes at time t
+                        plt.figure(figsize=(8,6))
+                        plt.plot(whole_time_log_all, total_bytes_acked, marker = 'o', label="Total Delivered Bytes", color="g")
+                        plt.plot(valid_times, valid_byte_sent_pre_rtt, marker = 'o', label="Total Sent Bytes (shifted)", color="b")
+                        if exit_time:
+                            plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
+                        if loss_time:
+                            plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
+                        if exit_time and loss_time:
+                            max_event = max(exit_time, loss_time)
+                            plt.xlim(0, max_event + 0.1) 
+                            y_val = np.where(valid_times <= max_event)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(0, max(valid_byte_sent_pre_rtt[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        plt.xlabel("Time (s)", fontsize=18)
+                        plt.ylabel("MBytes", fontsize=18)
+                        plt.title(f"Total Sent and Delivered Bytes (time shifted to previous RTT) - {folder}", fontsize=12)
+                        plt.xticks(fontsize=14)
+                        plt.yticks(fontsize=14)
+                        plt.legend(fontsize=14)
+                        plt.savefig(os.path.join(fig_subfolder_path, f"total_sent_in_prev_rtt_delivered_bytes_current_{num+1}.png"))
+                        plt.close()       
+
+                        # simulate SEARCH
+                        initial_rtt = whole_rtt_log_all.iloc[0] # Convert to seconds
+                        window_size = 3.5 * initial_rtt # 3.5 times initial RTT
+
+                        # calculate the window of delivered bytes (sliding per each data)
+                        index_loss = np.where(whole_time_log_all <= loss_time)[0] if loss_time else None
+                        delivered_bytes_window = []
+                        sent_bytes_window = []
+                        time_window = []
+                        rtt_related_to_window = []
+
+                        for i in range(len(whole_time_log_all)):
+                        # for i in range(len(whole_time_log_all[:index_loss[-1]])):
+                            # if whole_time_log_all.iloc[i] + window_size <= loss_time:
+                            end_of_window_idx = np.where(whole_time_log_all <= whole_time_log_all.iloc[i] + window_size)[0]
+                            if len(end_of_window_idx) > 0:
+                                end_of_window_idx = end_of_window_idx[-1]
+                                delivered_bytes_window.append(total_bytes_acked.iloc[end_of_window_idx] - total_bytes_acked.iloc[i])
+                                sent_bytes_window.append(total_bytes_sent.iloc[end_of_window_idx] - total_bytes_sent.iloc[i])
+                                time_window. append(whole_time_log_all.iloc[end_of_window_idx])
+                                rtt_related_to_window.append(whole_rtt_log_all.iloc[end_of_window_idx]) 
+
+                            else:
+                                delivered_bytes_window.append(None)
+                                sent_bytes_window.append(None)
+                                time_window.append(None)
+                                rtt_related_to_window.append(None)
+                                    
+                        
+                        # Find sent_bytes_window in the last RTT
+                        time_window_shifted_one_rtt_back = np.asarray(time_window) - np.asarray(rtt_related_to_window) # sec
+
+                        sent_bytes_window_last_rtt_interpolated = np.interp(
+                            time_window_shifted_one_rtt_back,
+                            time_window,
+                            sent_bytes_window)
+                        
+
+                        time_window = np.array(time_window)
+                        # plot sent_bytes_window_last_rtt_interpolated and delivered_bytes_window
+                        plt.figure(figsize=(8,6))
+                        plt.plot(time_window, sent_bytes_window_last_rtt_interpolated, marker = 'o', label="Sent Bytes in Last RTT", color="b")
+                        plt.plot(time_window, delivered_bytes_window, marker = 'o', label="Delivered Bytes in Window", color="g")
+                        if exit_time:
+                            plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
+                        if loss_time:
+                            plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
+                        if exit_time and loss_time:
+                            max_event = max(exit_time, loss_time)
+                            plt.xlim(0, max_event + 0.1) 
+                            y_val = np.where(time_window <= max_event)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(0, max(sent_bytes_window_last_rtt_interpolated[y_val[-1]], delivered_bytes_window[y_val[-1]]) + 2)
+                        plt.xlabel("Time (s)", fontsize=18)
+                        plt.ylabel("MBytes", fontsize=18)
+                        plt.title(f"Sent Bytes in Last RTT and Delivered Bytes in Window - {folder}", fontsize=12)
+                        plt.xticks(fontsize=14)
+                        plt.yticks(fontsize=14)
+                        plt.legend(fontsize=14)
+                        plt.savefig(os.path.join(fig_subfolder_path, f"estimated_sent_delivered_bytes_window_{num+1}.png"))
+                        plt.close()
+
+
+                        # find norm and graph
+                        norm_diff_based_window = (sent_bytes_window_last_rtt_interpolated - delivered_bytes_window) / sent_bytes_window_last_rtt_interpolated
+
+                        norm_diff_based_window[norm_diff_based_window < 0] = 0
+
+                        # plot norm
+                        plt.figure(figsize=(8, 6))  
+                        plt.plot(time_window, norm_diff_based_window, marker = 'o', color="m", label="Normalized Difference")
+                        if exit_time:
+                            plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
+                        if loss_time:
+                            plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
+                        if exit_time and loss_time:
+                            max_event = max(exit_time, loss_time)
+                            plt.xlim(0, max_event + 0.1) 
+                            y_val = np.where(time_window <= max_event)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(0, max(norm_diff_based_window[y_val[-1]], 0.35) + 0.05)
+                        plt.axhline(y=0.35, color='lightgray', linestyle='--', label='Threshold')
+
+                        plt.xlabel("Time (s)", fontsize=18)
+                        plt.ylabel("Normalized Difference", fontsize=18)
+                        plt.title(f"Normalized Difference Between Estimated Sent and Delivered Bytes - {folder}", fontsize=12)  
+                        plt.xticks(fontsize=14)
+                        plt.yticks(fontsize=14)
+                        plt.legend(fontsize=14)
+                        plt.savefig(os.path.join(fig_subfolder_path, f"norm_diff_estimated_sent_delivered_bytes_window_{num+1}.png"))
+                        plt.close()
+                        
 
                     #################### Find diff between delivery rate at exit and loss ############################
                     if delivery_rate and delivered_rate_at_loss_based_log:
@@ -746,11 +1038,11 @@ if SEARCH_RESULT:
                     # plt.title("Calculated delivery rate with shifting back by RTT until loss")
                     # plt.grid(True)
                     plt.legend()
-                    if exit_time:
-                        plt.xlim(0, exit_time + 0.1)
-                        index_exit = np.where(np.asarray(now_list[start_index_to_cal_delv_rate:]) <= exit_time)[0]
-                        plt.ylim(-1, max(delivery_rates_calculated[:index_exit[-1]]) * 1.1)
-                    plt.savefig(os.path.join(fig_subfolder_path, f"all_calculated_delivery_rate_{folder}_{num+1}_zoomed.png"))
+                    # if exit_time:
+                    #     plt.xlim(0, exit_time + 0.1)
+                    #     index_exit = np.where(np.asarray(now_list[start_index_to_cal_delv_rate:]) <= exit_time)[0]
+                    #     plt.ylim(-1, max(delivery_rates_calculated[:index_exit[-1]]) * 1.1)
+                    plt.savefig(os.path.join(fig_subfolder_path, f"all_calculated_delivery_rate_{folder}_{num+1}.png"))
                     plt.close()
 
                 # ################# Plot delivery rate from kernel log
@@ -971,9 +1263,9 @@ if SEARCH_RESULT:
                         ax1.axvline(exit_search_bin_index, linestyle="--", color='g', label="SEARCH Exit")
                         
                         # Add delivery_rate_at_exit annotation (if exists)
-                        if 'delivery_rate' in locals() and delivery_rate is not None:
+                        if 'delivery_rate' in locals() and delivery_rate_exit is not None:
                             ax1.text(exit_search_bin_index -7, ax1.get_ylim()[1] * 0.98,
-                                    f"Exit rate: {delivery_rate:.1f} Mbps",
+                                    f"Exit rate: {delivery_rate_exit:.1f} Mbps",
                                     color='green', fontsize=12, fontweight='bold', rotation=0, va='top')
 
                         # Add delivered_rate_at_loss_based_log annotation (if exists)
@@ -1021,84 +1313,84 @@ if SEARCH_RESULT:
 
                 ################## plot bin values and norm together (zoomed in first SEARCH exit)
 
-                if len(all_bin_values) > 0:
-                    fig, ax1 = plt.subplots(figsize=(15, 5))
+                # if len(all_bin_values) > 0:
+                    # fig, ax1 = plt.subplots(figsize=(15, 5))
 
-                    # Plot main bin values
-                    if len(all_bin_values_passed_bin_filled) > 0:
-                        ax1.plot(all_bin_values_passed_bin_filled, marker="o", markerfacecolor='none', linestyle="--", linewidth=1, color="dodgerblue", label="Missed Bin")
+                    # # Plot main bin values
+                    # if len(all_bin_values_passed_bin_filled) > 0:
+                    #     ax1.plot(all_bin_values_passed_bin_filled, marker="o", markerfacecolor='none', linestyle="--", linewidth=1, color="dodgerblue", label="Missed Bin")
 
-                    ax1.plot(all_bin_values, marker="o", linestyle="-", color="b", label="Bin Values")
+                    # ax1.plot(all_bin_values, marker="o", linestyle="-", color="b", label="Bin Values")
 
-                    if len(bin_index_reset) > 0:
-                        for i, idx in enumerate(bin_index_reset):
-                            ax1.axvline(idx, linestyle="--", color='dodgerblue', label="Reset" if i == 0 else "")
+                    # if len(bin_index_reset) > 0:
+                    #     for i, idx in enumerate(bin_index_reset):
+                    #         ax1.axvline(idx, linestyle="--", color='dodgerblue', label="Reset" if i == 0 else "")
 
-                            # Annotate the reset time
-                            if i < len(reset_times):
-                                ax1.text(idx, ax1.get_ylim()[0]- 1.2,  # Place at the bottom of the plot
-                                        f"{reset_times[i]:.3f}", rotation=90,
-                                        verticalalignment='top', horizontalalignment='center',
-                                        fontsize=10, color='darkblue')
+                    #         # Annotate the reset time
+                    #         if i < len(reset_times):
+                    #             ax1.text(idx, ax1.get_ylim()[0]- 1.2,  # Place at the bottom of the plot
+                    #                     f"{reset_times[i]:.3f}", rotation=90,
+                    #                     verticalalignment='top', horizontalalignment='center',
+                    #                     fontsize=10, color='darkblue')
                                 
-                    if exit_search_bin_index > 0:
-                        plt.xlim(-1, exit_search_bin_index + 10)
-                        # find y_vals and remove the None value to c an find max
-                        y_vals = [val for val in all_bin_values[:exit_search_bin_index + 10] if val is not None]
-                        if y_vals:
-                            ax1.set_ylim([-0.1, max(y_vals) *2])
+                    # if exit_search_bin_index > 0:
+                    #     plt.xlim(-1, exit_search_bin_index + 10)
+                    #     # find y_vals and remove the None value to c an find max
+                    #     y_vals = [val for val in all_bin_values[:exit_search_bin_index + 10] if val is not None]
+                    #     if y_vals:
+                    #         ax1.set_ylim([-0.1, max(y_vals) *2])
 
-                    if exit_search_bin_index > 0:
-                        ax1.axvline(exit_search_bin_index, linestyle="--", color='g', label="SEARCH Exit")
+                    # if exit_search_bin_index > 0:
+                    #     ax1.axvline(exit_search_bin_index, linestyle="--", color='g', label="SEARCH Exit")
                         
-                        # Add delivery_rate_at_exit annotation (if exists)
-                        if 'delivery_rate' in locals() and delivery_rate_exit is not None:
-                            ax1.text(exit_search_bin_index -7, ax1.get_ylim()[1] * 0.98,
-                                    f"Exit rate: {delivery_rate_exit:.1f} Mbps",
-                                    color='green', fontsize=12, fontweight='bold', rotation=0, va='top')
+                    #     # Add delivery_rate_at_exit annotation (if exists)
+                    #     if 'delivery_rate' in locals() and delivery_rate_exit is not None:
+                    #         ax1.text(exit_search_bin_index -7, ax1.get_ylim()[1] * 0.98,
+                    #                 f"Exit rate: {delivery_rate_exit:.1f} Mbps",
+                    #                 color='green', fontsize=12, fontweight='bold', rotation=0, va='top')
 
-                        # Add delivered_rate_at_loss_based_log annotation (if exists)
-                        if 'delivered_rate_at_loss_based_log' in locals() and delivered_rate_at_loss_based_log is not None:
-                            ax1.text(exit_search_bin_index -7, ax1.get_ylim()[1] * 0.91,
-                                    f"Loss rate: {delivered_rate_at_loss_based_log:.1f} Mbps",
-                                    color='red', fontsize=12, fontweight='bold', rotation=0, va='top')
+                    #     # Add delivered_rate_at_loss_based_log annotation (if exists)
+                    #     if 'delivered_rate_at_loss_based_log' in locals() and delivered_rate_at_loss_based_log is not None:
+                    #         ax1.text(exit_search_bin_index -7, ax1.get_ylim()[1] * 0.91,
+                    #                 f"Loss rate: {delivered_rate_at_loss_based_log:.1f} Mbps",
+                    #                 color='red', fontsize=12, fontweight='bold', rotation=0, va='top')
                             
-                        # Add headroom annotation (if exists)
-                        if 'diff_over_rtt' in locals() and diff_over_rtt is not None:
-                            ax1.text(exit_search_bin_index -7, ax1.get_ylim()[1] * 0.84,
-                                    f"Headroom: {diff_over_rtt:.1f} RTT",
-                                    color='darkslategrey', fontsize=12, fontweight='bold', rotation=0, va='top')    
-                    # Plot purple SEARCH points
-                    search_x = []
-                    search_y = []
+                    #     # Add headroom annotation (if exists)
+                    #     if 'diff_over_rtt' in locals() and diff_over_rtt is not None:
+                    #         ax1.text(exit_search_bin_index -7, ax1.get_ylim()[1] * 0.84,
+                    #                 f"Headroom: {diff_over_rtt:.1f} RTT",
+                    #                 color='darkslategrey', fontsize=12, fontweight='bold', rotation=0, va='top')    
+                    # # Plot purple SEARCH points
+                    # search_x = []
+                    # search_y = []
 
-                    for i, do_index in enumerate(search_do_bin_indices):
-                        # if exit_search_bin_index <= 0 or do_index <= exit_search_bin_index:
-                        search_x.append(do_index)
-                        search_y.append(all_bin_values[do_index])
-                        ax1.plot(do_index, all_bin_values[do_index], marker="o", color="purple", markersize=8,
-                                label="SEARCH Update" if i == 0 else "")
+                    # for i, do_index in enumerate(search_do_bin_indices):
+                    #     # if exit_search_bin_index <= 0 or do_index <= exit_search_bin_index:
+                    #     search_x.append(do_index)
+                    #     search_y.append(all_bin_values[do_index])
+                    #     ax1.plot(do_index, all_bin_values[do_index], marker="o", color="purple", markersize=8,
+                    #             label="SEARCH Update" if i == 0 else "")
 
-                    ax1.set_xlabel("Bin Updates")
-                    ax1.set_ylabel("Bin Values (Mb)")
-                    ax1.set_title("Bins")
+                    # ax1.set_xlabel("Bin Updates")
+                    # ax1.set_ylabel("Bin Values (Mb)")
+                    # ax1.set_title("Bins")
 
-                    # Create a second y-axis
-                    ax2 = ax1.twinx()
-                    ax2.plot(search_x, norm_list[:len(search_x)], color="silver", marker="x", label="Norm", linewidth=2)
-                    ax2.set_ylabel("Norm", color="dimgray")
-                    ax2.tick_params(axis='y', labelcolor="dimgray")
-                    ax2.set_ylim([-2, 50])
+                    # # Create a second y-axis
+                    # ax2 = ax1.twinx()
+                    # ax2.plot(search_x, norm_list[:len(search_x)], color="silver", marker="x", label="Norm", linewidth=2)
+                    # ax2.set_ylabel("Norm", color="dimgray")
+                    # ax2.tick_params(axis='y', labelcolor="dimgray")
+                    # ax2.set_ylim([-2, 50])
 
-                    # Combine legends
-                    lines_1, labels_1 = ax1.get_legend_handles_labels()
-                    lines_2, labels_2 = ax2.get_legend_handles_labels()
-                    ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc="upper left")
+                    # # Combine legends
+                    # lines_1, labels_1 = ax1.get_legend_handles_labels()
+                    # lines_2, labels_2 = ax2.get_legend_handles_labels()
+                    # ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc="upper left")
 
-                    # Save the merged plot
-                    plt.tight_layout()
-                    plt.savefig(os.path.join(fig_subfolder_path, f"merged_bin_norm_{folder}_{num+1}_zoomed.png"))
-                    plt.close()
+                    # # Save the merged plot
+                    # plt.tight_layout()
+                    # plt.savefig(os.path.join(fig_subfolder_path, f"merged_bin_norm_{folder}_{num+1}_zoomed.png"))
+                    # plt.close()
 
                 ###################### Plot RTT value for each bin update
                 if len(rtt_in_each_bin_update) > 0:
@@ -1131,12 +1423,12 @@ if SEARCH_RESULT:
                     plt.text(0.1, 0.95, f"Initial_rtt: {rtt_ms_list[0]:.3f}", fontsize=12, color="seagreen",
                             ha="center", va="center", transform=plt.gca().transAxes)
 
-                    if search_do_bin_indices:
-                        plt.xlim(-0.5, exit_search_bin_index + 10)
-                        y_vals_plot = [val for val in y_vals[: exit_search_bin_index + 10] if val is not None]
-                        plt.ylim(0, max(y_vals_plot) * 1.2)
+                    # if search_do_bin_indices:
+                    #     plt.xlim(-0.5, exit_search_bin_index + 10)
+                    #     y_vals_plot = [val for val in y_vals[: exit_search_bin_index + 10] if val is not None]
+                    #     plt.ylim(0, max(y_vals_plot) * 1.2)
                     plt.legend(loc="lower right")
-                    plt.savefig(os.path.join(fig_subfolder_path, f"rtt_in_each_bin_update_{num+1}_zoomed.png"))
+                    plt.savefig(os.path.join(fig_subfolder_path, f"rtt_in_each_bin_update_{num+1}.png"))
                     plt.close()
 
 
@@ -1161,15 +1453,15 @@ if SEARCH_RESULT:
                     plt.xlabel("Bin Update", fontsize=18)
                     plt.ylabel("Delivery Rate (Mb/s)", fontsize=18)
 
-                    if exit_search_bin_index > 0:
-                        plt.axvline(exit_search_bin_index, linestyle="--", color='g', label=f"SEARCH Exit-based_{folder}")
-                        plt.xlim(-0.5, exit_search_bin_index + 10)
-                        y_vals_plot = [val for val in y_vals[: exit_search_bin_index + 10] if val is not None]
-                        plt.ylim(0, max(y_vals_plot) * 1.2)
+                    # if exit_search_bin_index > 0:
+                    #     plt.axvline(exit_search_bin_index, linestyle="--", color='g', label=f"SEARCH Exit-based_{folder}")
+                    #     plt.xlim(-0.5, exit_search_bin_index + 10)
+                    #     y_vals_plot = [val for val in y_vals[: exit_search_bin_index + 10] if val is not None]
+                    #     plt.ylim(0, max(y_vals_plot) * 1.2)
                     plt.xticks(fontsize=14)
                     plt.yticks(fontsize=14)
                     plt.legend()
-                    plt.savefig(os.path.join(fig_subfolder_path, f"delivery_rate_in_each_bin_update_{num+1}_zoomed.png"))
+                    plt.savefig(os.path.join(fig_subfolder_path, f"delivery_rate_in_each_bin_update_{num+1}.png"))
                     plt.close()
 
 
