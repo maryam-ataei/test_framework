@@ -31,13 +31,15 @@ ANALYSIS_PCAP_FILE = True
 ANALYSIS_LOG_CSV = True
 
 cwd = os.getcwd()
-base_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/4g_office/both_data/data/output_4g_office_off_alpha200")
-pcap_csv_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/4g_office/both_data/data/pcap_server")
-log_csv_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/4g_office/both_data/data/log_cubic/")
-fig_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/4g_office/figs_for_diff_alpha_new")
+base_path = os.path.join(cwd, "/home/maryam/SEARCH/Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/data/data/testframework_output_fios_cable2/diff_extra_bins/extra_bin_num21")
+pcap_csv_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/data/data/pcap_server")
+log_csv_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/data/data/log_cubic/")
+fig_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/figs_for_diff_extra_bin_num/extra_bin_num21")
 os.makedirs(fig_path, exist_ok=True)
 
 config_output = None
+
+total_bins = 31 
 
 ############################### Functions #########################################
 def get_data(file_path):
@@ -70,6 +72,7 @@ def get_data(file_path):
     bin_index_no_reset = 0
     time_each_bin_filled = {}
     reset_times = []
+    needed_extra_bins_to_do_search = []
 
 
     for i, line in enumerate(lines):
@@ -107,7 +110,11 @@ def get_data(file_path):
         elif "rtt_us" in line:
             rtt_ms = int(re.search(r"rtt_us: (\d+)", line).group(1)) * 1e-3 # Convert to ms
             rtt_ms_list.append(rtt_ms) 
-
+        elif "Need " in line:
+            match = re.search(r"Need (\d+) extra bins", line)
+            if match:
+                needed_extra_bins = int(match.group(1))
+                needed_extra_bins_to_do_search.append(needed_extra_bins)
         elif "Current bin index" in line:
             bin_index_ = int(re.search(r"Current bin index: (\d+)", line).group(1))
             bin_index_list.append(bin_index_) 
@@ -162,13 +169,13 @@ def get_data(file_path):
                     current_bin_values[bin_index] = bin_value   
 
                 if missed_bin_flag == 0:
-                    if bin_index == bin_index_ % 25 and bin_index_ == bin_updates_counter:
+                    if bin_index == bin_index_ % total_bins and bin_index_ == bin_updates_counter:
                         all_bin_values.append(bin_value)
                         all_bin_values_passed_bin_filled.append(bin_value)
                         bin_updates_counter += 1
                 else: 
                     if reset_flag == 0:
-                        if bin_index == bin_index_ % 25 and bin_index_ == bin_updates_counter + passed_bin - 1:
+                        if bin_index == bin_index_ % total_bins and bin_index_ == bin_updates_counter + passed_bin - 1:
                             missed = 0
                             for m in range(passed_bin - 1):
                                 all_bin_values.append(None)
@@ -197,7 +204,7 @@ def get_data(file_path):
                         missed_bin_flag = 0
 
         # End of section, store the bin snapshot
-        if len(current_bin_values) == 25:
+        if len(current_bin_values) == total_bins:
             time_bin_update.append(now_us)
             bin_snapshots.append(current_bin_values)
             current_bin_values = {}
@@ -206,7 +213,7 @@ def get_data(file_path):
     return now_list, loss_happen_list, exit_time_list, passed_bin_list, passed_bin_time_list, rtt_ms_list, \
            bytes_acked_list, time_bin_update, bin_snapshots, bin_index_list, all_bin_values, bin_index_reset,  \
            all_bin_values_passed_bin_filled, exit_search_bin_index, search_do_bin_indices, norm_list, rtt_in_each_bin_update, \
-           time_each_bin_filled, reset_times, bin_end_time
+           time_each_bin_filled, reset_times, bin_end_time, needed_extra_bins_to_do_search
 
 
 def calculate_delivery_rate_per_ack(bytes_acked, now, rtt):
@@ -253,6 +260,31 @@ def extract_number(folder_name):
         return int(folder_name.replace("alpha", ""))
     except ValueError:
         return float('inf')  # puts invalid entries at the end
+    
+
+def calculate_window_of_data (time, window_size, bytes_acked, bytes_sent, rtt):
+
+    delivered_bytes_window = []
+    sent_bytes_window = []
+    time_window = []
+    rtt_related_to_window = []
+
+    for i in range(len(time)):
+        end_of_window_idx = np.where(time <= time.iloc[i] + window_size)[0]
+        if len(end_of_window_idx) > 0:
+            end_of_window_idx = end_of_window_idx[-1]
+            delivered_bytes_window.append(bytes_acked.iloc[end_of_window_idx] - bytes_acked.iloc[i])
+            sent_bytes_window.append(bytes_sent.iloc[end_of_window_idx] - bytes_sent.iloc[i])
+            time_window.append(time.iloc[end_of_window_idx])
+            rtt_related_to_window.append(rtt.iloc[end_of_window_idx]) 
+
+        else:
+            delivered_bytes_window.append(None)
+            sent_bytes_window.append(None)
+            time_window.append(None)
+            rtt_related_to_window.append(None)
+
+    return delivered_bytes_window, sent_bytes_window, time_window, rtt_related_to_window
 ###################################### SEARCH ##############################################################
 if SEARCH_RESULT:
     # Store results for all alpha folders
@@ -349,6 +381,7 @@ if SEARCH_RESULT:
             avg_rtt_list = []
             initial_rtt_files = []
             max_rtt_files = []
+            median_throughput_files = []
             total_missed_bins = []
             max_missed_bins = []
             total_resets_list = []
@@ -399,7 +432,7 @@ if SEARCH_RESULT:
             failure_exit_less_max_based_power_prime_over_time_list = []
 
             SERVER_IP = "130.215.28.249"
-            INTERVAL = 0.025
+            INTERVAL = 0.01
 
             analysed_files = num_files
 
@@ -411,8 +444,8 @@ if SEARCH_RESULT:
                     analysed_files -= 1
                     continue
                 
-                if num in [15, 38]:
-                    continue
+                # if num in [15, 38]:
+                #     continue
 
                     
                 print(f"Processing file: log_data_testframework{num+1}.txt")
@@ -421,7 +454,7 @@ if SEARCH_RESULT:
                 now_list, loss_happen_list, exit_time_list, passed_bin_list, passed_bin_time_list,rtt_ms_list, \
                 bytes_acked_list, time_bin_update, bin_snapshots, bin_index_list, all_bin_values, bin_index_reset, \
                 all_bin_values_passed_bin_filled, exit_search_bin_index, search_do_bin_indices, norm_list, rtt_in_each_bin_update, \
-                time_each_bin_filled, reset_times, bin_end_time= get_data(data_path)
+                time_each_bin_filled, reset_times, bin_end_time, needed_extra_bins_to_do_search= get_data(data_path)
 
                 # if loss does not happen, ignore the file (if there is no 1 in loss_happen_list)
                 if not any(loss_happen_list):
@@ -619,7 +652,8 @@ if SEARCH_RESULT:
                     csv_log_file = os.path.join(log_csv_path, f"log_data_testframework{num+1}.csv")
                     if os.path.exists(csv_log_file):
                         df_log = pd.read_csv(csv_log_file)
-
+                        
+                        MSS = df_log["mss"].iloc[0]
                         whole_time_log = df_log["now_us"] * 1e-6 # s
                         whole_rtt_log = df_log["rtt_us"] * 1e-6 # s
                         tp_delivered_rate = df_log["tp_deliver_rate"] * df_log["mss"].iloc[0]
@@ -684,7 +718,17 @@ if SEARCH_RESULT:
                             plt.xlim(0, max_event + 0.1) 
                             y_val = np.where(whole_time_log_all <= max_event)[0]
                             if len(y_val) > 0:
-                                plt.ylim(0, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                                plt.ylim(-0.1, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        elif exit_time:
+                            plt.xlim(0, exit_time + 0.1)
+                            y_val = np.where(whole_time_log_all <= exit_time)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(-0.1, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        elif loss_time:
+                            plt.xlim(0, loss_time + 0.1)
+                            y_val = np.where(whole_time_log_all <= loss_time)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(-0.1, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
                         plt.xlabel("Time (s)", fontsize=18)
                         plt.ylabel("MBytes", fontsize=18)
                         plt.title(f"Total Sent and Delivered Bytes - {folder}", fontsize=12)
@@ -710,7 +754,17 @@ if SEARCH_RESULT:
                             plt.xlim(0, max_event + 0.1) 
                             y_val = np.where(time_shifted_next_rtt <= max_event)[0]
                             if len(y_val) > 0:
-                                plt.ylim(0, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                                plt.ylim(-0.1, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        elif exit_time:
+                            plt.xlim(0, exit_time + 0.1)
+                            y_val = np.where(time_shifted_next_rtt <= exit_time)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(-0.1, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        elif loss_time:
+                            plt.xlim(0, loss_time + 0.1)
+                            y_val = np.where(time_shifted_next_rtt <= loss_time)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(-0.1, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
                         plt.xlabel("Time (s)", fontsize=18)
                         plt.ylabel("MBytes", fontsize=18)
                         plt.title(f"Total Sent and Delivered Bytes (time shifted to next RTT) - {folder}", fontsize=12)
@@ -719,46 +773,6 @@ if SEARCH_RESULT:
                         plt.legend(fontsize=14)
                         plt.savefig(os.path.join(fig_subfolder_path, f"total_sent_delivered_bytes_next_rtt_{num+1}.png"))
                         plt.close()
-
-
-                        # interpolated_delivered_next_rtt = np.interp(
-                        #     time_shifted_next_rtt,
-                        #     whole_time_log_all,
-                        #     total_bytes_acked
-                        # )
-
-
-                        # norm_diff_with_delv_shif = (total_bytes_sent - interpolated_delivered_next_rtt) / total_bytes_sent
-                        # norm_diff_with_delv_shif[norm_diff_with_delv_shif < 0] = 0
-                        
-                        # # Mask: only use times where t + RTT >= start of time log
-                        # valid_mask = time_shifted_next_rtt >= whole_time_log_all.iloc[0]
-                        # valid_times = whole_time_log_all[valid_mask]
-                        # valid_norm_diff_delv_shifted_back = norm_diff_with_delv_shif[valid_mask]
-
-                        # # Plot
-                        # plt.figure(figsize=(8, 6))
-                        # plt.plot(valid_times, valid_norm_diff_delv_shifted_back, marker = 'o', color="m", label="Normalized Difference")
-                        # if exit_time:
-                        #     plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
-                        # if loss_time:
-                        #     plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
-
-                        # if exit_time and loss_time:
-                        #     max_event = max(exit_time, loss_time)
-                        #     plt.xlim(0, max_event + 0.1) 
-                        #     y_val = np.where(valid_times <= max_event)[0]
-                        #     if len(y_val) > 0:
-                        #         plt.ylim(0, max(valid_norm_diff_delv_shifted_back[y_val[-1]], 0.35) + 0.05)
-                        # plt.axhline(y=0.35, color='lightgray', linestyle='--', label='Threshold')
-                        # plt.xlabel("Time (s)", fontsize=18)
-                        # plt.ylabel("Normalized Difference", fontsize=18)
-                        # plt.title(f"Normalized Difference Between Sent(t+RTT) and Delivered(t) - {folder}", fontsize=12)
-                        # plt.xticks(fontsize=14)
-                        # plt.yticks(fontsize=14)
-                        # plt.legend(fontsize=14)
-                        # plt.savefig(os.path.join(fig_subfolder_path, f"norm_diff_total_sent_delivered_bytes_{num+1}_delv_shifted_back.png"))
-                        # plt.close()
                         
                         # Shift time to t - RTT
                         time_shifted_prev_rtt = whole_time_log_all - whole_rtt_log_all
@@ -776,7 +790,17 @@ if SEARCH_RESULT:
                             plt.xlim(0, max_event + 0.1) 
                             y_val = np.where(time_shifted_prev_rtt <= max_event)[0]
                             if len(y_val) > 0:
-                                plt.ylim(0, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                                plt.ylim(-0.1, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        elif exit_time:
+                            plt.xlim(0, exit_time + 0.1)
+                            y_val = np.where(time_shifted_prev_rtt <= exit_time)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(-0.1, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        elif loss_time:
+                            plt.xlim(0, loss_time + 0.1)
+                            y_val = np.where(time_shifted_prev_rtt <= loss_time)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(-0.1, max(total_bytes_sent[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
                         plt.xlabel("Time (s)", fontsize=18)
                         plt.ylabel("MBytes", fontsize=18)
                         plt.title(f"Total Sent and Delivered Bytes (time shifted to previous RTT) - {folder}", fontsize=12)
@@ -787,70 +811,91 @@ if SEARCH_RESULT:
                         plt.close()
 
 
-                        # Interpolate sent bytes at time t - RTT
-                        interpolated_sent_prev_rtt = np.interp(
-                            time_shifted_prev_rtt,
-                            whole_time_log_all,
-                            total_bytes_sent
-                        )
+                        # # Interpolate sent bytes at time t - RTT
+                        # interpolated_sent_prev_rtt = np.interp(
+                        #     time_shifted_prev_rtt,
+                        #     whole_time_log_all,
+                        #     total_bytes_sent
+                        # )
 
-                        # Compute normalized difference
-                        norm_diff = (interpolated_sent_prev_rtt - total_bytes_acked) / interpolated_sent_prev_rtt
-                        norm_diff[norm_diff < 0] = 0
+                        # # Compute normalized difference
+                        # norm_diff = (interpolated_sent_prev_rtt - total_bytes_acked) / interpolated_sent_prev_rtt
+                        # norm_diff[norm_diff < 0] = 0
 
-                        # Mask: only use times where t - RTT >= start of time log
-                        valid_mask = time_shifted_prev_rtt >= whole_time_log_all.iloc[0]
-                        valid_times = whole_time_log_all[valid_mask]
-                        valid_norm_diff = norm_diff[valid_mask]
-                        valid_byte_sent_pre_rtt = interpolated_sent_prev_rtt[valid_mask]
+                        # # Mask: only use times where t - RTT >= start of time log
+                        # valid_mask = time_shifted_prev_rtt >= whole_time_log_all.iloc[0]
+                        # valid_times = whole_time_log_all[valid_mask]
+                        # valid_norm_diff = norm_diff[valid_mask]
+                        # valid_byte_sent_pre_rtt = interpolated_sent_prev_rtt[valid_mask]
 
                         
-                        # Plot
-                        plt.figure(figsize=(8, 6))
-                        plt.plot(valid_times, valid_norm_diff, marker = 'o', color="m", label="Normalized Difference")
-                        if exit_time:
-                            plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
-                        if loss_time:
-                            plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
-                        if exit_time and loss_time:
-                            max_event = max(exit_time, loss_time)
-                            plt.xlim(0, max_event + 0.1) 
-                            y_val = np.where(valid_times <= max_event)[0]
-                            if len(y_val) > 0:
-                                plt.ylim(0, max(valid_norm_diff[y_val[-1]], 0.35) + 0.05)
-                        plt.axhline(y=0.35, color='lightgray', linestyle='--', label='Threshold')
-                        plt.xlabel("Time (s)", fontsize=18)
-                        plt.ylabel("Normalized Difference", fontsize=18)
-                        plt.title(f"Normalized Difference Between Sent(t-RTT) and Delivered(t) - {folder}", fontsize=12)
-                        plt.xticks(fontsize=14)
-                        plt.yticks(fontsize=14)
-                        plt.legend(fontsize=14)
-                        plt.savefig(os.path.join(fig_subfolder_path, f"norm_diff_total_sent_delivered_bytes_{num+1}.png"))
-                        plt.close()
+                        # # Plot
+                        # plt.figure(figsize=(8, 6))
+                        # plt.plot(valid_times, valid_norm_diff, marker = 'o', color="m", label="Normalized Difference")
+                        # if exit_time:
+                        #     plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
+                        # if loss_time:
+                        #     plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
+                        # if exit_time and loss_time:
+                        #     max_event = max(exit_time, loss_time)
+                        #     plt.xlim(0, max_event + 0.1) 
+                        #     y_val = np.where(valid_times <= max_event)[0]
+                        #     if len(y_val) > 0:
+                        #         plt.ylim(0, max(valid_norm_diff[:y_val[-1]]) + 0.05)
+                        # elif exit_time:
+                        #     plt.xlim(0, exit_time + 0.1)
+                        #     y_val = np.where(valid_times <= exit_time)[0]
+                        #     if len(y_val) > 0:
+                        #         plt.ylim(0, max(valid_norm_diff[:y_val[-1]]) + 0.05)
+                        # elif loss_time:
+                        #     plt.xlim(0, loss_time + 0.1)
+                        #     y_val = np.where(valid_times <= loss_time)[0]
+                        #     if len(y_val) > 0:
+                        #         plt.ylim(0, max(valid_norm_diff[:y_val[-1]]) + 0.05)
+                        # plt.axhline(y=0.35, color='lightgray', linestyle='--', label='Threshold')
+                        # plt.xlabel("Time (s)", fontsize=18)
+                        # plt.ylabel("Normalized Difference", fontsize=18)
+                        # plt.title(f"Normalized Difference Between Est_Sent(t-RTT) and Delivered(t) - {folder}", fontsize=12)
+                        # plt.xticks(fontsize=14)
+                        # plt.yticks(fontsize=14)
+                        # plt.legend(fontsize=14)
+                        # plt.savefig(os.path.join(fig_subfolder_path, f"norm_diff_total_sent_delivered_bytes_{num+1}.png"))
+                        # plt.close()
 
 
-                        # plot delivered bytes and interpolated sent bytes at time t
-                        plt.figure(figsize=(8,6))
-                        plt.plot(whole_time_log_all, total_bytes_acked, marker = 'o', label="Total Delivered Bytes", color="g")
-                        plt.plot(valid_times, valid_byte_sent_pre_rtt, marker = 'o', label="Total Sent Bytes (shifted)", color="b")
-                        if exit_time:
-                            plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
-                        if loss_time:
-                            plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
-                        if exit_time and loss_time:
-                            max_event = max(exit_time, loss_time)
-                            plt.xlim(0, max_event + 0.1) 
-                            y_val = np.where(valid_times <= max_event)[0]
-                            if len(y_val) > 0:
-                                plt.ylim(0, max(valid_byte_sent_pre_rtt[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
-                        plt.xlabel("Time (s)", fontsize=18)
-                        plt.ylabel("MBytes", fontsize=18)
-                        plt.title(f"Total Sent and Delivered Bytes (time shifted to previous RTT) - {folder}", fontsize=12)
-                        plt.xticks(fontsize=14)
-                        plt.yticks(fontsize=14)
-                        plt.legend(fontsize=14)
-                        plt.savefig(os.path.join(fig_subfolder_path, f"total_sent_in_prev_rtt_delivered_bytes_current_{num+1}.png"))
-                        plt.close()       
+                        # # plot delivered bytes and interpolated sent bytes at time t
+                        # plt.figure(figsize=(8,6))
+                        # plt.plot(whole_time_log_all, total_bytes_acked, marker = 'o', label="Total Delivered Bytes", color="g")
+                        # plt.plot(valid_times, valid_byte_sent_pre_rtt, marker = 'o', label="Total Est_Sent Bytes (t-RTT)", color="b")
+                        # if exit_time:
+                        #     plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
+                        # if loss_time:
+                        #     plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
+                        # if exit_time and loss_time:
+                        #     max_event = max(exit_time, loss_time)
+                        #     plt.xlim(0, max_event + 0.1) 
+                        #     y_val = np.where(valid_times <= max_event)[0]
+                        #     if len(y_val) > 0:
+                        #         plt.ylim(-0.1, max(valid_byte_sent_pre_rtt[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        # elif exit_time:
+                        #     plt.xlim(0, exit_time + 0.1)
+                        #     y_val = np.where(valid_times <= exit_time)[0]
+                        #     if len(y_val) > 0:
+                        #         plt.ylim(-0.1, max(valid_byte_sent_pre_rtt[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        # elif loss_time:
+                        #     plt.xlim(0, loss_time + 0.1)
+                        #     y_val = np.where(valid_times <= loss_time)[0]
+                        #     if len(y_val) > 0:
+                        #         plt.ylim(-0.1, max(valid_byte_sent_pre_rtt[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
+                        # plt.xlabel("Time (s)", fontsize=18)
+                        # plt.ylabel("MBytes", fontsize=18)
+                        # plt.title(f"Total Est_Sent (t-RTT) and Delivered Bytes (t) at time (t) - {folder}", fontsize=12)
+                        # plt.xticks(fontsize=14)
+                        # plt.yticks(fontsize=14)
+                        # plt.legend(fontsize=14)
+                        # plt.savefig(os.path.join(fig_subfolder_path, f"total_est_sent_in_prev_rtt_delivered_bytes_current_{num+1}.png"))
+                        # plt.close()   
+
 
                         # simulate SEARCH
                         initial_rtt = whole_rtt_log_all.iloc[0] # Convert to seconds
@@ -858,29 +903,10 @@ if SEARCH_RESULT:
 
                         # calculate the window of delivered bytes (sliding per each data)
                         index_loss = np.where(whole_time_log_all <= loss_time)[0] if loss_time else None
-                        delivered_bytes_window = []
-                        sent_bytes_window = []
-                        time_window = []
-                        rtt_related_to_window = []
-
-                        for i in range(len(whole_time_log_all)):
-                        # for i in range(len(whole_time_log_all[:index_loss[-1]])):
-                            # if whole_time_log_all.iloc[i] + window_size <= loss_time:
-                            end_of_window_idx = np.where(whole_time_log_all <= whole_time_log_all.iloc[i] + window_size)[0]
-                            if len(end_of_window_idx) > 0:
-                                end_of_window_idx = end_of_window_idx[-1]
-                                delivered_bytes_window.append(total_bytes_acked.iloc[end_of_window_idx] - total_bytes_acked.iloc[i])
-                                sent_bytes_window.append(total_bytes_sent.iloc[end_of_window_idx] - total_bytes_sent.iloc[i])
-                                time_window. append(whole_time_log_all.iloc[end_of_window_idx])
-                                rtt_related_to_window.append(whole_rtt_log_all.iloc[end_of_window_idx]) 
-
-                            else:
-                                delivered_bytes_window.append(None)
-                                sent_bytes_window.append(None)
-                                time_window.append(None)
-                                rtt_related_to_window.append(None)
                                     
-                        
+                        delivered_bytes_window, sent_bytes_window, time_window, rtt_related_to_window = calculate_window_of_data(
+                            whole_time_log_all, window_size, total_bytes_acked, total_bytes_sent, whole_rtt_log_all)
+
                         # Find sent_bytes_window in the last RTT
                         time_window_shifted_one_rtt_back = np.asarray(time_window) - np.asarray(rtt_related_to_window) # sec
 
@@ -893,8 +919,8 @@ if SEARCH_RESULT:
                         time_window = np.array(time_window)
                         # plot sent_bytes_window_last_rtt_interpolated and delivered_bytes_window
                         plt.figure(figsize=(8,6))
-                        plt.plot(time_window, sent_bytes_window_last_rtt_interpolated, marker = 'o', label="Sent Bytes in Last RTT", color="b")
-                        plt.plot(time_window, delivered_bytes_window, marker = 'o', label="Delivered Bytes in Window", color="g")
+                        plt.plot(time_window, sent_bytes_window_last_rtt_interpolated, marker = 'o', label="Est_Sent Wnd Bytes (t - RTT)", color="b")
+                        plt.plot(time_window, delivered_bytes_window, marker = 'o', label="Delivered Wnd Bytes", color="g")
                         if exit_time:
                             plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
                         if loss_time:
@@ -904,10 +930,20 @@ if SEARCH_RESULT:
                             plt.xlim(0, max_event + 0.1) 
                             y_val = np.where(time_window <= max_event)[0]
                             if len(y_val) > 0:
-                                plt.ylim(0, max(sent_bytes_window_last_rtt_interpolated[y_val[-1]], delivered_bytes_window[y_val[-1]]) + 2)
+                                plt.ylim(-0.1, max(sent_bytes_window_last_rtt_interpolated[y_val[-1]], delivered_bytes_window[y_val[-1]]) + 2)
+                        elif exit_time:
+                            plt.xlim(0, exit_time + 0.1)
+                            y_val = np.where(time_window <= exit_time)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(-0.1, max(sent_bytes_window_last_rtt_interpolated[y_val[-1]], delivered_bytes_window[y_val[-1]]) + 2)
+                        elif loss_time:
+                            plt.xlim(0, loss_time + 0.1)
+                            y_val = np.where(time_window <= loss_time)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(-0.1, max(sent_bytes_window_last_rtt_interpolated[y_val[-1]], delivered_bytes_window[y_val[-1]]) + 2)
                         plt.xlabel("Time (s)", fontsize=18)
-                        plt.ylabel("MBytes", fontsize=18)
-                        plt.title(f"Sent Bytes in Last RTT and Delivered Bytes in Window - {folder}", fontsize=12)
+                        plt.ylabel("MBytes / 3.5init_RTT", fontsize=18)
+                        plt.title(f"Est_Sent Bytes (t-RTT) and Delivered Bytes(t) at time (t) (wndw:3.5RTT) - {folder}", fontsize=12)
                         plt.xticks(fontsize=14)
                         plt.yticks(fontsize=14)
                         plt.legend(fontsize=14)
@@ -933,17 +969,62 @@ if SEARCH_RESULT:
                             y_val = np.where(time_window <= max_event)[0]
                             if len(y_val) > 0:
                                 plt.ylim(0, max(norm_diff_based_window[y_val[-1]], 0.35) + 0.05)
+                        elif exit_time:
+                            plt.xlim(0, exit_time + 0.1)
+                            y_val = np.where(time_window >= exit_time)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(0, max(norm_diff_based_window[y_val[0]], 0.35) + 0.05)
+                        elif loss_time:
+                            plt.xlim(0, loss_time + 0.1)
+                            y_val = np.where(time_window >= loss_time)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(0, max(norm_diff_based_window[:y_val[0]]) + 0.05)
+                        
                         plt.axhline(y=0.35, color='lightgray', linestyle='--', label='Threshold')
 
                         plt.xlabel("Time (s)", fontsize=18)
                         plt.ylabel("Normalized Difference", fontsize=18)
-                        plt.title(f"Normalized Difference Between Estimated Sent and Delivered Bytes - {folder}", fontsize=12)  
+                        plt.title(f"Norm Between Estimated Sent and Delivered Bytes (wnd:3.5RTT) - {folder}", fontsize=12)  
                         plt.xticks(fontsize=14)
                         plt.yticks(fontsize=14)
                         plt.legend(fontsize=14)
                         plt.savefig(os.path.join(fig_subfolder_path, f"norm_diff_estimated_sent_delivered_bytes_window_{num+1}.png"))
                         plt.close()
-                        
+
+                        # find diff total_sent_bytes and total_delv_bytes at time t
+                        diff_total_sent_delv_bytes = total_bytes_sent - total_bytes_acked
+
+                        # plot
+                        plt.figure(figsize=(8, 6))
+                        plt.plot(whole_time_log_all, diff_total_sent_delv_bytes, marker = 'o', color="c", label="In-flight (Sent - Delivered)")
+                        if exit_time:
+                            plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
+                        if loss_time:
+                            plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
+                        if exit_time and loss_time:
+                            max_event = max(exit_time, loss_time)
+                            plt.xlim(0, max_event + 0.1) 
+                            y_val = np.where(whole_time_log_all >= max_event)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(-0.1, max(diff_total_sent_delv_bytes[:y_val[0]]) + 0.05)
+                        elif exit_time:
+                            plt.xlim(0, exit_time + 0.1)
+                            y_val = np.where(whole_time_log_all >= exit_time)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(-0.1, max(diff_total_sent_delv_bytes[:y_val[0]]) + 0.05)
+                        elif loss_time:
+                            plt.xlim(0, loss_time + 0.1)
+                            y_val = np.where(whole_time_log_all >= loss_time)[0]
+                            if len(y_val) > 0:
+                                plt.ylim(-0.1, max(diff_total_sent_delv_bytes[:y_val[0]]) + 0.05)
+                        plt.xlabel("Time (s)", fontsize=18)
+                        plt.ylabel("MBytes", fontsize=18)
+                        plt.title(f"In flight over time - {folder}", fontsize=12)
+                        plt.xticks(fontsize=14)
+                        plt.yticks(fontsize=14)
+                        plt.legend(fontsize=14)
+                        plt.savefig(os.path.join(fig_subfolder_path, f"diff_total_sent_delivered_bytes_{num+1}.png"))
+                        plt.close()
 
                     #################### Find diff between delivery rate at exit and loss ############################
                     if delivery_rate and delivered_rate_at_loss_based_log:
@@ -1102,59 +1183,92 @@ if SEARCH_RESULT:
                 # plt.savefig(os.path.join(fig_subfolder_path, f"diff_interval_rtt_{num+1}.png"))
                 # plt.close()
 
-                # ############### Plot CDF of missed bins
-                # # Compute CDF
-                # missed_bins_sorted = np.sort(missed_bins_list)
-                # cdf = np.arange(1, len(missed_bins_sorted) + 1) / len(missed_bins_sorted)
+                ############### Plot CDF of missed bins
+                # Compute CDF
+                missed_bins_sorted = np.sort(missed_bins_list)
+                cdf = np.arange(1, len(missed_bins_sorted) + 1) / len(missed_bins_sorted)
 
-                # plt.figure(figsize=(10, 5))
-                # plt.plot(missed_bins_sorted, cdf, marker="o", linestyle="-", color="b")
-                # plt.xlabel("Missed Bins")
-                # plt.ylabel("CDF")
-                # plt.title("CDF of Missed Bins")
+                plt.figure(figsize=(10, 5))
+                plt.plot(missed_bins_sorted, cdf, marker="o", linestyle="-", color="b")
+                plt.xlabel("Missed Bins")
+                plt.ylabel("Cumulative Distribution")
+                plt.title("CDF of Missed Bins")
                 # plt.grid(True)
-                # plt.savefig(os.path.join(fig_subfolder_path, f"cdf_{num+1}.png"))
-                # plt.close()
+                plt.savefig(os.path.join(fig_subfolder_path, f"cdf_missed_bins_{num+1}.png"))
+                plt.close()
 
-                # ############### plot CDF of missed bins before exit
-                # if exit_before_loss:
-                #     if any(np.array(passed_bin_time_list) < exit_time):
-                #         missed_bins_before_exit = missed_bins_list[:np.where(np.array(passed_bin_time_list) < exit_time)[0][-1]]
-                #     else:
-                #         missed_bins_before_exit = []
+                ############### plot CDF of missed bins before exit
+                if exit_before_loss:
+                    if any(np.array(passed_bin_time_list) < exit_time):
+                        missed_bins_before_exit = missed_bins_list[:np.where(np.array(passed_bin_time_list) < exit_time)[0][-1]]
+                    else:
+                        missed_bins_before_exit = []
 
-                #     missed_bins_sorted = np.sort(missed_bins_before_exit)
-                #     cdf = np.arange(1, len(missed_bins_sorted) + 1) / len(missed_bins_sorted)
+                    missed_bins_sorted = np.sort(missed_bins_before_exit)
+                    cdf = np.arange(1, len(missed_bins_sorted) + 1) / len(missed_bins_sorted)
 
-                #     plt.figure(figsize=(10, 5))
-                #     plt.plot(missed_bins_sorted, cdf, marker="o", linestyle="-", color="b")
-                #     plt.xlabel("Missed Bins", fontsize=18)
-                #     plt.ylabel("CDF", fontsize=18)
-                #     plt.xticks(fontsize=14)
-                #     plt.yticks(fontsize=14)
-                #     plt.title("CDF of Missed Bins Before Exit")
-                #     plt.grid(True)
-                #     plt.savefig(os.path.join(fig_subfolder_path, f"cdf_before_exit_{num+1}.png"))
-                #     plt.close()
+                    plt.figure(figsize=(10, 5))
+                    plt.plot(missed_bins_sorted, cdf, marker="o", linestyle="-", color="b")
+                    plt.xlabel("Missed Bins", fontsize=18)
+                    plt.ylabel("Cumulative Distribution", fontsize=18)
+                    plt.xticks(fontsize=14)
+                    plt.yticks(fontsize=14)
+                    plt.title("CDF of Missed Bins Before Exit")
+                    # plt.grid(True)
+                    plt.savefig(os.path.join(fig_subfolder_path, f"cdf_missed_bins_before_exit_{num+1}.png"))
+                    plt.close()
 
-                # ###################### Plot missed_bin over time
-                # plt.figure(figsize=(15, 5))
-                # plt.plot(df_missed_bins["time_missed_bins"], df_missed_bins["missed_bins"], marker="o", linestyle="-", color="b")
-                # # add vertical lines for exit time
-                # if exit_time:
-                #     plt.axvline(exit_time, color="r", linestyle="--", label="Exit Time")
-                # plt.xlabel("Time (s)", fontsize=18)
-                # plt.ylabel("Missed Bins", fontsize=18)
-                # plt.xticks(fontsize=14)
-                # plt.yticks(fontsize=14)
-                # plt.xlim(left=0)
-                # plt.ylim(bottom=0)
-                # plt.title("Missed Bins Over Time")
+                ###################### Plot missed_bin over time
+                plt.figure(figsize=(15, 5))
+                plt.plot(df_missed_bins["time_missed_bins"], df_missed_bins["missed_bins"], marker="o", linestyle="-", color="b")
+                # add vertical lines for exit time
+                if exit_time:
+                    plt.axvline(exit_time, color="r", linestyle="--", label="Exit Time")
+                plt.xlabel("Time (s)", fontsize=18)
+                plt.ylabel("Missed Bins", fontsize=18)
+                plt.xticks(fontsize=14)
+                plt.yticks(fontsize=14)
+                plt.xlim(left=0)
+                plt.ylim(bottom=0)
+                plt.title("Missed Bins Over Time")
                 # plt.grid(True)
-                # # plt.legend()
-                # plt.savefig(os.path.join(fig_subfolder_path, f"missed_bins_{num+1}.png"))
-                # plt.close()
+                # plt.legend()
+                plt.savefig(os.path.join(fig_subfolder_path, f"missed_bins_{num+1}.png"))
+                plt.close()
 
+                ###################### Plot CDF needed extra bins to do SEARCH
+                if len(needed_extra_bins_to_do_search) > 0:
+                    needed_extra_bins_sorted = np.sort(needed_extra_bins_to_do_search)
+                    cdf_needed_extra_bins = np.arange(1, len(needed_extra_bins_sorted) + 1) / len(needed_extra_bins_sorted)
+
+                    plt.figure(figsize=(10, 5))
+                    plt.plot(needed_extra_bins_sorted, cdf_needed_extra_bins, marker="o", linestyle="-", color="b")
+                    plt.xlabel("Needed Extra Bins to do S, fontsize=18EARCH", fontsize=18)
+                    plt.ylabel("Cumulative Distribution", fontsize=18)
+                    # plt.title("CDF of Needed Extra Bins to do SEARCH")
+                    plt.xticks(fontsize=14)
+                    plt.yticks(fontsize=14)
+                    plt.xlim(left=0)
+                    plt.ylim(bottom=0)
+                    plt.savefig(os.path.join(fig_subfolder_path, f"cdf_needed_extra_bins_to_do_search_until_loss{num+1}.png"))
+                    plt.close()
+
+                ###################### Plot CDF needed extra bins to do SEARCH if exit doe not happen
+                if len(needed_extra_bins_to_do_search) > 0 and exit_time is None:
+                    needed_extra_bins_to_do_search_when_not_exit_sorted = np.sort(needed_extra_bins_to_do_search)
+                    cdf_needed_extra_bins_when_not_exit = np.arange(1, len(needed_extra_bins_to_do_search_when_not_exit_sorted) + 1) / len(needed_extra_bins_to_do_search_when_not_exit_sorted)
+
+                    plt.figure(figsize=(10, 5))
+                    plt.plot(needed_extra_bins_to_do_search_when_not_exit_sorted, cdf_needed_extra_bins_when_not_exit, marker="o", linestyle="-", color="b")
+                    plt.xlabel("Needed Extra Bins to do SEARCH (not exit)", fontsize=18)
+                    plt.ylabel("Cumulative Distribution", fontsize=18)
+                    # plt.title("CDF of Needed Extra Bins to do SEARCH (not exit)")
+                    plt.xticks(fontsize=14)
+                    plt.yticks(fontsize=14)
+                    plt.xlim(left=0)
+                    plt.ylim(bottom=0)
+                    plt.savefig(os.path.join(fig_subfolder_path, f"cdf_needed_extra_bins_to_do_search_not_exit{num+1}.png"))
+                    plt.close()
                 # ###################### plot bin values (remove bitshifting impact) over time
                 # #Prepare the matrix (rows = time steps, cols = bins)
                 # matrix = np.array([[snapshot.get(i, 0.0) for i in range(25)] for snapshot in bin_snapshots])
@@ -1556,6 +1670,11 @@ if SEARCH_RESULT:
                             start_time = end_time
                             end_time = start_time + INTERVAL
 
+                        # find median of throughput
+                        if throughputs:
+                            median_throughput = np.median(throughputs)
+                            median_throughput_files.append(median_throughput)
+
                         ################# plot throughput
                         plt.figure(figsize=(10, 5))
                         plt.plot(timestamps_thput, throughputs, marker="o", linestyle="-", color="b")
@@ -1572,6 +1691,112 @@ if SEARCH_RESULT:
                         # plt.title("Throughput Over Time")
                         plt.savefig(os.path.join(fig_subfolder_path, f"throughput_{num+1}.png"))
                         plt.close()
+
+                        ################## plot cdf ack size
+                        if len(df) > 0:
+                            ack_numbers = df['Ack number'].dropna().values
+
+                            ack_numbers = ack_numbers[ack_numbers > 1000]  # Filter out 38 valus as they are not valid for ack numbers
+
+                            # find the difference between consecutive ack numbers
+                            ack_diffs = np.diff(ack_numbers)
+                            # remove zero values
+                            ack_diffs = ack_diffs[ack_diffs > 0]
+
+                            # Calculate CDF
+                            sorted_ack_diffs = np.sort(ack_diffs)
+                            cdf = np.arange(1, len(sorted_ack_diffs) + 1) / len(sorted_ack_diffs)
+                            
+                            plt.figure(figsize=(10, 5))
+                            plt.plot(sorted_ack_diffs, cdf, marker="o", linestyle="-", color="b")
+                            plt.xlabel("Ack Size (bytes)", fontsize=18)
+                            plt.ylabel("Cumulative Distribution", fontsize=18)
+                            plt.xticks(fontsize=14)
+                            plt.yticks(fontsize=14)
+                            plt.xlim(left=0)
+                            plt.ylim(bottom=0)
+                            # plt.title("CDF of Ack Size")
+                            plt.savefig(os.path.join(fig_subfolder_path, f"cdf_ack_size_{num+1}.png"))
+                            plt.close()
+
+                            # ack size based on packets
+                            if MSS:
+                                ack_diffs_packets = ack_diffs / MSS
+                            else:
+                                ack_diffs_packets = ack_diffs / 1448  # Default MSS value
+
+                            # Calculate CDF for ack size based on packets
+                            sorted_ack_diffs_packets = np.sort(ack_diffs_packets)
+                            cdf_packets = np.arange(1, len(sorted_ack_diffs_packets) + 1) / len(sorted_ack_diffs_packets)
+                            
+                            plt.figure(figsize=(10, 5))
+                            plt.plot(sorted_ack_diffs_packets, cdf_packets, marker="o", linestyle="-", color="b")
+                            plt.xlabel("Ack Size (packets)", fontsize=18)
+                            plt.ylabel("Cumulative Distribution", fontsize=18)
+                            plt.xticks(fontsize=14)
+                            plt.yticks(fontsize=14)
+                            plt.xlim(left=0)
+                            plt.ylim(bottom=0)
+                            # plt.title("CDF of Ack Size (packets)")
+                            plt.savefig(os.path.join(fig_subfolder_path, f"cdf_ack_size_packets_{num+1}.png"))
+                            plt.close()
+
+                            # plot cdf ack size based on bytes and packets until time loss
+                            if loss_time and len(ack_diffs) > 0:
+                                # Find the index of the first ack number greater than loss_time
+                                index_loss = np.where(np.asarray(df['Time']) >= loss_time)[0][0]
+                                
+                                if index_loss > 0:
+                                    ack_diffs_until_loss = ack_diffs[:index_loss]
+                                    ack_diffs_packets_until_loss = ack_diffs_packets[:index_loss]
+
+                                    # Calculate CDF for ack size until loss 
+                                    sorted_ack_diffs_until_loss = np.sort(ack_diffs_until_loss)
+                                    cdf_until_loss = np.arange(1, len(sorted_ack_diffs_until_loss) + 1) / len(sorted_ack_diffs_until_loss)
+
+                                    plt.figure(figsize=(10, 5))
+                                    plt.plot(sorted_ack_diffs_until_loss, cdf_until_loss, marker="o", linestyle="-", color="b")
+                                    plt.xlabel("Ack Size (bytes)", fontsize=18)
+                                    plt.ylabel("Cumulative Distribution", fontsize=18)
+                                    plt.xticks(fontsize=14)
+                                    plt.yticks(fontsize=14)
+                                    plt.xlim(left=-0.1)
+                                    plt.ylim(bottom=-0.01)
+                                    # plt.title("CDF of Ack Size Until Loss")
+                                    plt.savefig(os.path.join(fig_subfolder_path, f"cdf_ack_size_until_loss_{num+1}.png"))
+                                    plt.close()
+
+                                    # Calculate CDF for ack size based on packets until loss
+                                    sorted_ack_diffs_packets_until_loss = np.sort(ack_diffs_packets_until_loss)
+                                    cdf_packets_until_loss = np.arange(1, len(sorted_ack_diffs_packets_until_loss) + 1) / len(sorted_ack_diffs_packets_until_loss)
+                                    
+                                    plt.figure(figsize=(10, 5))
+                                    plt.plot(sorted_ack_diffs_packets_until_loss, cdf_packets_until_loss, marker="o", linestyle="-", color="b")
+                                    plt.xlabel("Ack Size (packets)", fontsize=18)
+                                    plt.ylabel("Cumulative Distribution", fontsize=18)
+                                    plt.xticks(fontsize=14)
+                                    plt.yticks(fontsize=14)
+                                    plt.xlim(left=-0.1)
+                                    plt.ylim(bottom=-0.01)
+                                    # plt.title("CDF of Ack Size (packets) Until Loss")
+                                    plt.savefig(os.path.join(fig_subfolder_path, f"cdf_ack_size_packets_until_loss_{num+1}.png"))
+                                    plt.close()
+
+                                    # plot ack size based on packet over time until loss    
+                                    plt.figure(figsize=(10, 5))
+                                    plt.plot(df['Time'][:index_loss], ack_diffs_packets[:index_loss], marker="o", linestyle="-", color="b")
+                                    if exit_time:
+                                        plt.axvline(exit_time, color="g", linestyle="--", label=f"Exit Time-based_{folder}")
+                                    plt.xlabel("Time (s)", fontsize=18)
+                                    plt.ylabel("Ack Size (packets)", fontsize=18)
+                                    plt.xticks(fontsize=14)
+                                    plt.yticks(fontsize=14)
+                                    plt.xlim(left=0)
+                                    plt.ylim(bottom=0)
+                                    # plt.title("Ack Size (packets) Over Time Until Loss")
+                                    plt.savefig(os.path.join(fig_subfolder_path, f"ack_size_packets_over_time_until_loss_{num+1}.png"))
+                                    plt.close()
+
 
                 ####################### average throughput
                 if len(throughputs) > 0:
@@ -1911,7 +2136,7 @@ if SEARCH_RESULT:
     #             plt.figure(figsize=(10, 5))
     #             plt.plot(delivery_rate_sorted, cdf, marker="o", linestyle="-", color="b")
     #             plt.xlabel("Delivery Rate (Mb/s)", fontsize=18)
-    #             plt.ylabel("CDF", fontsize=18)
+    #             plt.ylabel("Cumulative Distribution", fontsize=18)
     #             plt.xticks(fontsize=14)
     #             plt.yticks(fontsize=14)
     #             plt.xlim(left=0)
@@ -1954,6 +2179,72 @@ if SEARCH_RESULT:
             plt.savefig(os.path.join(fig_path, f"delivery_rate_at_loss_exit__max_{folder}.png"))
             plt.close()
 
+            ########################## plot cdf delivery rate at exit (delivery_rate_exit_over_time_list)
+            delivery_rate_exit_over_time_list = [x for x in delivery_rate_exit_over_time_list if x is not None]
+            if delivery_rate_exit_over_time_list:
+                delivery_rate_exit_over_time_sorted = np.sort(delivery_rate_exit_over_time_list)
+                cdf = np.arange(1, len(delivery_rate_exit_over_time_sorted) + 1) / len(delivery_rate_exit_over_time_sorted)
+                plt.figure(figsize=(10, 5))
+                plt.plot(delivery_rate_exit_over_time_sorted, cdf, marker="o", linestyle="-", color="b")
+                plt.xlabel("Delivery Rate at Exit (Mb/s)", fontsize=18)
+                plt.ylabel("Cumulative Distribution", fontsize=18)
+                plt.xticks(fontsize=14)
+                plt.yticks(fontsize=14)
+                plt.xlim(left=0)
+                plt.ylim(bottom=0)
+                plt.title("CDF of Delivery Rate at Exit Over Time")
+                plt.savefig(os.path.join(fig_path, f"cdf_delivery_rate_exit_over_time_{folder}.png"))
+                plt.close()
+
+            ########################## plot cdf delivery rate at exit and median_throughput_files
+            median_throughput_files = [x for x in median_throughput_files if x is not None]
+            if median_throughput_files:
+                median_throughput_sorted = np.sort(median_throughput_files)
+                cdf = np.arange(1, len(median_throughput_sorted) + 1) / len(median_throughput_sorted)
+
+                plt.figure(figsize=(10, 5))
+                plt.plot(median_throughput_sorted, cdf, marker="o", linestyle="-", color="b")
+                plt.xlabel("Median Throughput (Mb/s)", fontsize=18)
+                plt.ylabel("Cumulative Distribution", fontsize=18)
+                plt.xticks(fontsize=14)
+                plt.yticks(fontsize=14)
+                plt.xlim(left=0)
+                plt.ylim(bottom=0)
+                plt.title("CDF of Median Throughput")
+                plt.savefig(os.path.join(fig_path, f"cdf_median_throughput_{folder}.png"))
+                plt.close()
+
+            ########################## plot cdf absolute norm diff (median_throughput - delivery_rate_exit_over_time_list) / median_throughput
+
+            if median_throughput_files and delivery_rate_exit_over_time_list:
+                abs_norm_diff = [
+                    abs((median - delivery_rate) / median) if median and delivery_rate else None
+                    for median, delivery_rate in zip(median_throughput_files, delivery_rate_exit_over_time_list)    
+                ]
+
+                abs_norm_diff = [x for x in abs_norm_diff if x is not None]
+
+                # remove abs_norm_diff > 0.2
+                abs_norm_diff = [x for x in abs_norm_diff if x <= 0.2]
+                
+                if abs_norm_diff:
+                    abs_norm_diff_sorted = np.sort(abs_norm_diff)
+                    cdf = np.arange(1, len(abs_norm_diff_sorted) + 1) / len(abs_norm_diff_sorted)
+
+                    plt.figure(figsize=(10, 5))
+                    plt.plot(abs_norm_diff_sorted, cdf, marker="o", linestyle="-", color="b")
+                    plt.xlabel("Normalized Absolute Difference", fontsize=18)
+                    plt.ylabel("Cumulative Distribution", fontsize=18)
+                    plt.xticks(fontsize=14)
+                    plt.yticks(fontsize=14)
+                    plt.xlim([0, 2])
+                    plt.ylim(bottom=0)
+                    plt.title("CDF of Absolute Normalized Difference")
+                    plt.savefig(os.path.join(fig_path, f"cdf_abs_norm_diff_median_throughput_delivery_rate_exit_{folder}_new.png"))
+                    plt.close()
+
+
+
             ########################## plot cdf time diff between exit time and loss time
             # find cdf of diff_over_rtt
             diff_ = [x for x in diff_time_loss_exit if x is not None]
@@ -1964,7 +2255,7 @@ if SEARCH_RESULT:
             plt.figure(figsize=(10, 5))
             plt.plot(diff_time_sorted, cdf, marker="o", linestyle="-", color="b")
             plt.xlabel("loss_time - exit_time (s)", fontsize=18)
-            plt.ylabel("CDF", fontsize=18)
+            plt.ylabel("Cumulative Distribution", fontsize=18)
             plt.xticks(fontsize=14)
             plt.yticks(fontsize=14)
             plt.savefig(os.path.join(fig_path, f"cdf_time_diff_{folder}.png"))
@@ -1979,7 +2270,7 @@ if SEARCH_RESULT:
             plt.figure(figsize=(10, 5))
             plt.plot(diff_time_loss_exit_over_rtt_sorted, cdf, marker="o", linestyle="-", color="b")
             plt.xlabel("Headrooms", fontsize=18)
-            plt.ylabel("CDF", fontsize=18)
+            plt.ylabel("Cumulative Distribution", fontsize=18)
             plt.xticks(fontsize=14)
             plt.yticks(fontsize=14)
             plt.savefig(os.path.join(fig_path, f"cdf_headroom_{folder}.png"))
@@ -1993,7 +2284,7 @@ if SEARCH_RESULT:
             plt.figure(figsize=(10, 5))
             plt.plot(diff_delivery_rate_loss_exit_sorted, cdf, marker="o", linestyle="-", color="b")
             plt.xlabel("diff_delivery_rate between loss and exit (Mb/s)", fontsize=18)
-            plt.ylabel("CDF", fontsize=18)
+            plt.ylabel("Cumulative Distribution", fontsize=18)
             plt.xticks(fontsize=14)
             plt.yticks(fontsize=14)
             plt.savefig(os.path.join(fig_path, f"cdf_diff_delivery_rate_loss_exit_{folder}.png"))
@@ -2062,7 +2353,7 @@ if SEARCH_RESULT:
             # plt.figure(figsize=(10, 5))
             # plt.plot(diff_manual_chokepoint_exit_rate_list_sorted, cdf, marker="o", linestyle="-", color="b")
             # plt.xlabel("diff manual chokepoint_rate - exit_rate (Mb/s)", fontsize=18)
-            # plt.ylabel("CDF", fontsize=18)  
+            # plt.ylabel("Cumulative Distribution", fontsize=18)  
             # plt.xticks(fontsize=14)
             # plt.yticks(fontsize=14)
             # plt.savefig(os.path.join(fig_path, f"cdf_diff_manual_chokepoint_exit_rate_list_{folder}.png"))
@@ -2076,7 +2367,7 @@ if SEARCH_RESULT:
             # plt.figure(figsize=(10, 5))
             # plt.plot(diff_manual_chokepoint_loss_rate_list_sorted, cdf, marker="o", linestyle="-", color="b")
             # plt.xlabel("diff manual chokepoint_rate - loss_rate (Mb/s)", fontsize=18)
-            # plt.ylabel("CDF", fontsize=18)
+            # plt.ylabel("Cumulative Distribution", fontsize=18)
             # plt.xticks(fontsize=14)
             # plt.yticks(fontsize=14)
             # plt.savefig(os.path.join(fig_path, f"cdf_diff_manual_chokepoint_loss_rate_list_{folder}.png"))
@@ -2194,7 +2485,7 @@ if SEARCH_RESULT:
             # plt.figure(figsize=(10, 5))
             # plt.plot(total_missed_bins_sorted, cdf, marker="o", linestyle="-", color="b")
             # plt.xlabel("Total Missed Bins", fontsize=18)
-            # plt.ylabel("CDF", fontsize=18)
+            # plt.ylabel("Cumulative Distribution", fontsize=18)
             # plt.xticks(fontsize=14)
             # plt.yticks(fontsize=14)
             # plt.xlim(left=-0.5)
@@ -2229,7 +2520,7 @@ if SEARCH_RESULT:
     #                 plt.figure(figsize=(10, 5))
     #                 plt.plot(avg_throughput_sorted, cdf, marker="o", linestyle="-", color="b")
     #                 plt.xlabel("Avg Throughput (Mb/s)", fontsize=18)
-    #                 plt.ylabel("CDF",   fontsize=18)
+    #                 plt.ylabel("Cumulative Distribution",   fontsize=18)
     #                 plt.xticks(fontsize=14)
     #                 plt.yticks(fontsize=14)
     #                 plt.xlim(left=0)
@@ -2247,7 +2538,7 @@ if SEARCH_RESULT:
     #                 plt.figure(figsize=(10, 5))
     #                 plt.plot(throughput_at_time_loss_sorted, cdf, marker="o", linestyle="-", color="b")
     #                 plt.xlabel("Throughput at Time of Loss (Mb/s)", fontsize=18)
-    #                 plt.ylabel("CDF", fontsize=18)
+    #                 plt.ylabel("Cumulative Distribution", fontsize=18)
     #                 plt.xticks(fontsize=14)
     #                 plt.yticks(fontsize=14)
     #                 plt.xlim(left=0)
@@ -2278,7 +2569,7 @@ if SEARCH_RESULT:
     #             plt.figure(figsize=(10, 5))
     #             plt.plot(time_of_first_loss_list_sorted, cdf, marker="o", linestyle="-", color="b")
     #             plt.xlabel("Time of First Loss (s)", fontsize=18)
-    #             plt.ylabel("CDF", fontsize=18)
+    #             plt.ylabel("Cumulative Distribution", fontsize=18)
     #             plt.xticks(fontsize=14)
     #             plt.yticks(fontsize=14)
     #             plt.xlim(left=0)
@@ -2531,7 +2822,7 @@ if SEARCH_RESULT:
     # for folder, (sorted_values, cdf) in cdf_dif_power_loss_exit_dict.items():
     #     plt.plot(sorted_values, cdf, marker='o', label=folder)
     # plt.xlabel("Diff Power between loss and exit (Mb/s/s)", fontsize=18)
-    # plt.ylabel("CDF", fontsize=18)
+    # plt.ylabel("Cumulative Distribution", fontsize=18)
     # plt.xticks(fontsize=14)
     # plt.yticks(fontsize=14)
     # plt.legend()
@@ -2543,7 +2834,7 @@ if SEARCH_RESULT:
     for folder, (sorted_values, cdf) in cdf_diff_delivery_rate_loss_exit_dict.items():
         plt.plot(sorted_values, cdf, marker='o', label=folder)
     plt.xlabel("diff_delivery_rate (loss - exit)", fontsize=18)
-    plt.ylabel("CDF", fontsize=18)
+    plt.ylabel("Cumulative Distribution", fontsize=18)
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
     plt.legend()
@@ -2556,7 +2847,7 @@ if SEARCH_RESULT:
     for folder, (sorted_values, cdf) in cdf_normalized_diff_delivery_rate_loss_exit_dict.items():
         plt.plot(sorted_values, cdf, marker='o', label=folder)
     plt.xlabel("normalized_diff delivery_rate (loss - exit / loss) )", fontsize=18)
-    plt.ylabel("CDF", fontsize=18)
+    plt.ylabel("Cumulative Distribution", fontsize=18)
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
     plt.legend()
@@ -2569,7 +2860,7 @@ if SEARCH_RESULT:
     for folder, (sorted_values, cdf) in cdf_normalized_diff_delivery_rate_loss_exit_dict.items():
         plt.plot(sorted_values, cdf, marker='o', label=folder)
     plt.xlabel("normalized_diff delivery_rate (loss - exit / loss)", fontsize=18)
-    plt.ylabel("CDF", fontsize=18)
+    plt.ylabel("Cumulative Distribution", fontsize=18)
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
     # plt.xlim(right=10)
@@ -2583,7 +2874,7 @@ if SEARCH_RESULT:
     for folder, (sorted_values, cdf) in cdf_diff_rtt_loss_exit_dict.items():
         plt.plot(sorted_values, cdf, marker='o', label=folder)
     plt.xlabel("diff_rtt (loss - exit)", fontsize=18)
-    plt.ylabel("CDF", fontsize=18)
+    plt.ylabel("Cumulative Distribution", fontsize=18)
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
     plt.legend()
@@ -2596,7 +2887,7 @@ if SEARCH_RESULT:
     for folder, (sorted_values, cdf) in cdf_diff_time_loss_exit_dict.items():
         plt.plot(sorted_values, cdf, marker = 'o' ,label=folder)
     plt.xlabel("diff_time between loss and exit (s)", fontsize=18)
-    plt.ylabel("CDF", fontsize=18)
+    plt.ylabel("Cumulative Distribution", fontsize=18)
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
     plt.legend()
@@ -2609,7 +2900,7 @@ if SEARCH_RESULT:
     for folder, (sorted_values, cdf) in cdf_diff_time_loss_exit_over_rtt_dict.items():
         plt.plot(sorted_values, cdf,marker="o", label=folder)
     plt.xlabel("Headrooms (loss_time - exit_time) / RTT", fontsize=18)
-    plt.ylabel("CDF", fontsize=18)
+    plt.ylabel("Cumulative Distribution", fontsize=18)
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
     plt.legend()
@@ -2650,6 +2941,7 @@ if SEARCH_RESULT:
     plt.ylim(0, 100)
     plt.savefig(os.path.join(fig_path, "percentage_no_exit.png"))
     plt.close()
+
 
     ############################### Rank alphas by loss_rate - exit_rate
     alphas = folder_names

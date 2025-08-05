@@ -417,12 +417,16 @@ def generate_files(input_file, keyword):
                 function_declarations_str = "\n".join(function_declarations) + "\n" if function_declarations else ""
 
                 # Write all components to the file
-                outfile.write(header_comment + "\n" + include_guard + function_declarations_str)
+                outfile.write(header_comment + "\n" + include_guard)
 
                 # Add any additional defs content
                 if defs_content:
                     outfile.write("\n" + defs_content + "\n")
 
+                # Add function declarations
+                if function_declarations_str:
+                    outfile.write(function_declarations_str + "\n")
+                    
                 outfile.write(f"\n#endif // {keyword.upper()}_DEFS_H\n")
             print(f"Generated: {f"{keyword}_defs.h"}")
 

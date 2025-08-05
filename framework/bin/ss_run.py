@@ -16,7 +16,7 @@ def run_test(executable, input_file, output_file):
     except subprocess.CalledProcessError as e:
         print(f"Error during test execution: {e}")
 
-def process_input_files(input_folder, output_folder, keyword):
+def process_input_files(input_folder, output_folder, keyword, test_dir):
     """Process all .csv files in the input folder and generate output .txt files."""
     try:
         # Ensure the output directory exists
@@ -47,6 +47,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run tests for all .csv files in the input folder.")
 
     parser.add_argument("-k", "--keyword", required=True, help="The keyword used for the test (e.g., 'SEARCH').")
+    parser.add_argument("-d", "--test_dir", required=True, help="The directory containing the test executable.")
     parser.add_argument("-i", "--input_folder", required=True, help="The folder containing the input .csv files.")
     parser.add_argument("-o", "--output_folder", required=True, help="The folder to save the output .txt files.")
 
@@ -54,7 +55,7 @@ def main():
     args = parser.parse_args()
 
     # Process the input files and generate output files
-    process_input_files(args.input_folder, args.output_folder, args.keyword)
+    process_input_files(args.input_folder, args.output_folder, args.keyword, args.test_dir)
 
 if __name__ == "__main__":
     main()
