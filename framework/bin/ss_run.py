@@ -23,7 +23,7 @@ def process_input_files(input_folder, output_folder, keyword, test_dir):
         os.makedirs(output_folder, exist_ok=True)
 
         # Check if the executable exists
-        executable = f"test_dir/test_{keyword}"
+        executable = f"{test_dir}/test_{keyword}"
         if not os.path.isfile(executable):
             print(f"Error: {executable} does not exist. Please compile the object file first.")
             return
