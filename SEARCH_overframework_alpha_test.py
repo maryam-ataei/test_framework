@@ -31,15 +31,15 @@ ANALYSIS_PCAP_FILE = True
 ANALYSIS_LOG_CSV = True
 
 cwd = os.getcwd()
-base_path = os.path.join(cwd, "/home/maryam/SEARCH/Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/data/data/testframework_output_fios_cable2/diff_extra_bins/extra_bin_num21")
+base_path = os.path.join(cwd, "/home/maryam/SEARCH/Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/data/data/testframework_output_fios_cable2/fios_cable2_window_bins_twenty_extra_forty")
 pcap_csv_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/data/data/pcap_server")
 log_csv_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/data/data/log_cubic/")
-fig_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/figs_for_diff_extra_bin_num/extra_bin_num21")
+fig_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/figs_fios_cable2_window_bins_twenty_extra_forty")
 os.makedirs(fig_path, exist_ok=True)
 
 config_output = None
 
-total_bins = 31 
+total_bins = 60 
 
 ############################### Functions #########################################
 def get_data(file_path):
@@ -62,6 +62,7 @@ def get_data(file_path):
     bin_index_reset = []
     all_bin_values = []
     reset_flag = 0
+    reset_for_app_limited = 0
     missed_bin_flag = 0
     bin_updates_counter = 0
     all_bin_values_passed_bin_filled = []
@@ -73,11 +74,13 @@ def get_data(file_path):
     time_each_bin_filled = {}
     reset_times = []
     needed_extra_bins_to_do_search = []
+    needed_extra_bins_in_exit = None
 
 
     for i, line in enumerate(lines):
-        if i == 7853:
-            cc = 0
+        # # print(i)
+        # if i == 305:
+        #     cc = 0
         if "now_us:" in line:
             now_us = int(re.search(r"now_us: (\d+)", line).group(1)) * 1e-6 # Convert to seconds
             now_list.append(now_us)
@@ -100,7 +103,8 @@ def get_data(file_path):
         elif "Exit Slow Start at" in line:
             exit_time = int(re.search(r"Exit Slow Start at (\d+)", line).group(1)) * 1e-6 # Convert to seconds
             exit_time_list.append(exit_time)
-            exit_search_bin_index = ((len(all_bin_values))+passed_bin - 1) if len(all_bin_values) > 0 else 0         
+            exit_search_bin_index = ((len(all_bin_values))+passed_bin - 1) if len(all_bin_values) > 0 else 0   
+            needed_extra_bins_in_exit = needed_extra_bins      
         elif "bytes_acked" in line:
             bytes_acked = int(re.search(r"bytes_acked: (\d+)", line).group(1)) * 1e-6 * 8 # Convert to Mb
             bytes_acked_list.append(bytes_acked)
@@ -127,6 +131,10 @@ def get_data(file_path):
             elif len(bin_index_list) > 1 and bin_index_ > bin_index_list[-2]:
                 bin_index_no_reset += 1
             # if the last key in the rtt_in_each_bin_update is less than bin_index_no_reset - 1, fill the between values with the last value
+            if reset_for_app_limited == 1:
+                rtt_in_each_bin_update[bin_index_no_reset] = rtt_ms
+                time_each_bin_filled[bin_index_no_reset] = now_us
+                reset_for_app_limited = 0
             if len(bin_index_list) > 1 and bin_index_no_reset - 1 > max(rtt_in_each_bin_update.keys()):
                 for j in range(max(rtt_in_each_bin_update.keys()) + 1, bin_index_no_reset):
                     # set to last value
@@ -149,14 +157,25 @@ def get_data(file_path):
                 time_match = re.search(r"now_us: (\d+)", lines[j])
                 if time_match:
                     reset_times.append(int(time_match.group(1)) * 1e-6)  # Convert to seconds
-                    break  
+                    break 
+        elif "app limited, reset search" in line: 
+            reset_for_app_limited = 1
+            bin_updates_counter = 0
+            time_bin_update = []
+            all_bin_values = []
+            all_bin_values_passed_bin_filled = []
+            bin_snapshots = []
+            search_do_bin_indices = []
+            time_each_bin_filled = {}
+            rtt_in_each_bin_update = {}
         elif "norm " in line:
             match = re.search(r"norm (-?\d+(?:\.\d+)?)", line)
             if match:
                 norm_value = float(match.group(1))
                 if (norm_value < 0 or norm_value > 100):
                     norm_value = 0
-            search_do_bin_indices.append((len(all_bin_values) + passed_bin - 1) if len(all_bin_values) > 0 else 0)
+            # search_do_bin_indices.append((len(all_bin_values) + passed_bin - 1) if len(all_bin_values) > 0 else 0)
+            search_do_bin_indices.append(bin_index_list[-1]+ passed_bin)
             norm_list.append(norm_value)
         if (len(now_list) == 1) or (now_us and len(bin_end_time) >= 2 and now_us >= bin_end_time[-2]):  
             if "Bin[" in line:
@@ -213,7 +232,7 @@ def get_data(file_path):
     return now_list, loss_happen_list, exit_time_list, passed_bin_list, passed_bin_time_list, rtt_ms_list, \
            bytes_acked_list, time_bin_update, bin_snapshots, bin_index_list, all_bin_values, bin_index_reset,  \
            all_bin_values_passed_bin_filled, exit_search_bin_index, search_do_bin_indices, norm_list, rtt_in_each_bin_update, \
-           time_each_bin_filled, reset_times, bin_end_time, needed_extra_bins_to_do_search
+           time_each_bin_filled, reset_times, bin_end_time, needed_extra_bins_to_do_search, needed_extra_bins_in_exit
 
 
 def calculate_delivery_rate_per_ack(bytes_acked, now, rtt):
@@ -345,8 +364,6 @@ if SEARCH_RESULT:
     avg_success_exit_over_time_dict = {}
     avg_success_exit_over_time_based_power_prime_dict = {}
 
- 
-
     for folder in sorted(os.listdir(base_path), key=extract_number):
         folder_path = os.path.join(base_path, folder)
 
@@ -430,6 +447,8 @@ if SEARCH_RESULT:
             avg_power_prime_over_time_list = []
             success_exit_based_power_prime_over_time_list = []
             failure_exit_less_max_based_power_prime_over_time_list = []
+            needed_extra_bins_in_exit_list = []
+            needed_extra_bins_to_do_search_dict = {}
 
             SERVER_IP = "130.215.28.249"
             INTERVAL = 0.01
@@ -444,7 +463,7 @@ if SEARCH_RESULT:
                     analysed_files -= 1
                     continue
                 
-                # if num in [15, 38]:
+                # if num in [8]:
                 #     continue
 
                     
@@ -453,8 +472,9 @@ if SEARCH_RESULT:
                 # Extract data from data files (.txt)
                 now_list, loss_happen_list, exit_time_list, passed_bin_list, passed_bin_time_list,rtt_ms_list, \
                 bytes_acked_list, time_bin_update, bin_snapshots, bin_index_list, all_bin_values, bin_index_reset, \
-                all_bin_values_passed_bin_filled, exit_search_bin_index, search_do_bin_indices, norm_list, rtt_in_each_bin_update, \
-                time_each_bin_filled, reset_times, bin_end_time, needed_extra_bins_to_do_search= get_data(data_path)
+                all_bin_values_passed_bin_filled, exit_search_bin_index, search_do_bin_indices, norm_list, \
+                rtt_in_each_bin_update, time_each_bin_filled, reset_times, bin_end_time, \
+                needed_extra_bins_to_do_search, needed_extra_bins_in_exit = get_data(data_path)
 
                 # if loss does not happen, ignore the file (if there is no 1 in loss_happen_list)
                 if not any(loss_happen_list):
@@ -462,6 +482,9 @@ if SEARCH_RESULT:
                     analysed_files -= 1
                     continue
                 
+                ########################## Extra needeed bins dict ##########################
+                needed_extra_bins_in_exit_list.append(needed_extra_bins_in_exit)
+                needed_extra_bins_to_do_search_dict[num] = needed_extra_bins_to_do_search
                 ########################## Find missed bins #####################################
                 missed_bins_list = np.asarray(passed_bin_list) - 1
                 # Create a Pandas DataFrame
@@ -810,93 +833,6 @@ if SEARCH_RESULT:
                         plt.savefig(os.path.join(fig_subfolder_path, f"total_sent_delivered_bytes_prev_rtt_{num+1}.png"))
                         plt.close()
 
-
-                        # # Interpolate sent bytes at time t - RTT
-                        # interpolated_sent_prev_rtt = np.interp(
-                        #     time_shifted_prev_rtt,
-                        #     whole_time_log_all,
-                        #     total_bytes_sent
-                        # )
-
-                        # # Compute normalized difference
-                        # norm_diff = (interpolated_sent_prev_rtt - total_bytes_acked) / interpolated_sent_prev_rtt
-                        # norm_diff[norm_diff < 0] = 0
-
-                        # # Mask: only use times where t - RTT >= start of time log
-                        # valid_mask = time_shifted_prev_rtt >= whole_time_log_all.iloc[0]
-                        # valid_times = whole_time_log_all[valid_mask]
-                        # valid_norm_diff = norm_diff[valid_mask]
-                        # valid_byte_sent_pre_rtt = interpolated_sent_prev_rtt[valid_mask]
-
-                        
-                        # # Plot
-                        # plt.figure(figsize=(8, 6))
-                        # plt.plot(valid_times, valid_norm_diff, marker = 'o', color="m", label="Normalized Difference")
-                        # if exit_time:
-                        #     plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
-                        # if loss_time:
-                        #     plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
-                        # if exit_time and loss_time:
-                        #     max_event = max(exit_time, loss_time)
-                        #     plt.xlim(0, max_event + 0.1) 
-                        #     y_val = np.where(valid_times <= max_event)[0]
-                        #     if len(y_val) > 0:
-                        #         plt.ylim(0, max(valid_norm_diff[:y_val[-1]]) + 0.05)
-                        # elif exit_time:
-                        #     plt.xlim(0, exit_time + 0.1)
-                        #     y_val = np.where(valid_times <= exit_time)[0]
-                        #     if len(y_val) > 0:
-                        #         plt.ylim(0, max(valid_norm_diff[:y_val[-1]]) + 0.05)
-                        # elif loss_time:
-                        #     plt.xlim(0, loss_time + 0.1)
-                        #     y_val = np.where(valid_times <= loss_time)[0]
-                        #     if len(y_val) > 0:
-                        #         plt.ylim(0, max(valid_norm_diff[:y_val[-1]]) + 0.05)
-                        # plt.axhline(y=0.35, color='lightgray', linestyle='--', label='Threshold')
-                        # plt.xlabel("Time (s)", fontsize=18)
-                        # plt.ylabel("Normalized Difference", fontsize=18)
-                        # plt.title(f"Normalized Difference Between Est_Sent(t-RTT) and Delivered(t) - {folder}", fontsize=12)
-                        # plt.xticks(fontsize=14)
-                        # plt.yticks(fontsize=14)
-                        # plt.legend(fontsize=14)
-                        # plt.savefig(os.path.join(fig_subfolder_path, f"norm_diff_total_sent_delivered_bytes_{num+1}.png"))
-                        # plt.close()
-
-
-                        # # plot delivered bytes and interpolated sent bytes at time t
-                        # plt.figure(figsize=(8,6))
-                        # plt.plot(whole_time_log_all, total_bytes_acked, marker = 'o', label="Total Delivered Bytes", color="g")
-                        # plt.plot(valid_times, valid_byte_sent_pre_rtt, marker = 'o', label="Total Est_Sent Bytes (t-RTT)", color="b")
-                        # if exit_time:
-                        #     plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
-                        # if loss_time:
-                        #     plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
-                        # if exit_time and loss_time:
-                        #     max_event = max(exit_time, loss_time)
-                        #     plt.xlim(0, max_event + 0.1) 
-                        #     y_val = np.where(valid_times <= max_event)[0]
-                        #     if len(y_val) > 0:
-                        #         plt.ylim(-0.1, max(valid_byte_sent_pre_rtt[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
-                        # elif exit_time:
-                        #     plt.xlim(0, exit_time + 0.1)
-                        #     y_val = np.where(valid_times <= exit_time)[0]
-                        #     if len(y_val) > 0:
-                        #         plt.ylim(-0.1, max(valid_byte_sent_pre_rtt[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
-                        # elif loss_time:
-                        #     plt.xlim(0, loss_time + 0.1)
-                        #     y_val = np.where(valid_times <= loss_time)[0]
-                        #     if len(y_val) > 0:
-                        #         plt.ylim(-0.1, max(valid_byte_sent_pre_rtt[y_val[-1]], total_bytes_acked[y_val[-1]]) + 2)
-                        # plt.xlabel("Time (s)", fontsize=18)
-                        # plt.ylabel("MBytes", fontsize=18)
-                        # plt.title(f"Total Est_Sent (t-RTT) and Delivered Bytes (t) at time (t) - {folder}", fontsize=12)
-                        # plt.xticks(fontsize=14)
-                        # plt.yticks(fontsize=14)
-                        # plt.legend(fontsize=14)
-                        # plt.savefig(os.path.join(fig_subfolder_path, f"total_est_sent_in_prev_rtt_delivered_bytes_current_{num+1}.png"))
-                        # plt.close()   
-
-
                         # simulate SEARCH
                         initial_rtt = whole_rtt_log_all.iloc[0] # Convert to seconds
                         window_size = 3.5 * initial_rtt # 3.5 times initial RTT
@@ -1243,7 +1179,7 @@ if SEARCH_RESULT:
 
                     plt.figure(figsize=(10, 5))
                     plt.plot(needed_extra_bins_sorted, cdf_needed_extra_bins, marker="o", linestyle="-", color="b")
-                    plt.xlabel("Needed Extra Bins to do S, fontsize=18EARCH", fontsize=18)
+                    plt.xlabel("Needed Extra Bins to do SEARCH", fontsize=18)
                     plt.ylabel("Cumulative Distribution", fontsize=18)
                     # plt.title("CDF of Needed Extra Bins to do SEARCH")
                     plt.xticks(fontsize=14)
@@ -1253,22 +1189,6 @@ if SEARCH_RESULT:
                     plt.savefig(os.path.join(fig_subfolder_path, f"cdf_needed_extra_bins_to_do_search_until_loss{num+1}.png"))
                     plt.close()
 
-                ###################### Plot CDF needed extra bins to do SEARCH if exit doe not happen
-                if len(needed_extra_bins_to_do_search) > 0 and exit_time is None:
-                    needed_extra_bins_to_do_search_when_not_exit_sorted = np.sort(needed_extra_bins_to_do_search)
-                    cdf_needed_extra_bins_when_not_exit = np.arange(1, len(needed_extra_bins_to_do_search_when_not_exit_sorted) + 1) / len(needed_extra_bins_to_do_search_when_not_exit_sorted)
-
-                    plt.figure(figsize=(10, 5))
-                    plt.plot(needed_extra_bins_to_do_search_when_not_exit_sorted, cdf_needed_extra_bins_when_not_exit, marker="o", linestyle="-", color="b")
-                    plt.xlabel("Needed Extra Bins to do SEARCH (not exit)", fontsize=18)
-                    plt.ylabel("Cumulative Distribution", fontsize=18)
-                    # plt.title("CDF of Needed Extra Bins to do SEARCH (not exit)")
-                    plt.xticks(fontsize=14)
-                    plt.yticks(fontsize=14)
-                    plt.xlim(left=0)
-                    plt.ylim(bottom=0)
-                    plt.savefig(os.path.join(fig_subfolder_path, f"cdf_needed_extra_bins_to_do_search_not_exit{num+1}.png"))
-                    plt.close()
                 # ###################### plot bin values (remove bitshifting impact) over time
                 # #Prepare the matrix (rows = time steps, cols = bins)
                 # matrix = np.array([[snapshot.get(i, 0.0) for i in range(25)] for snapshot in bin_snapshots])
@@ -1352,15 +1272,18 @@ if SEARCH_RESULT:
                 # plt.close()
 
                 ################## plot bin values and norm together
+                # convert bin values  from Mb to MB
+                all_bin_values_passed_bin_filled_MB = [val / 8 if val is not None else None for val in all_bin_values_passed_bin_filled]
+                all_bin_values_MB = [val / 8 if val is not None else None for val in all_bin_values]
 
-                if len(all_bin_values) > 0:
+                if len(all_bin_values_MB) > 0:
                     fig, ax1 = plt.subplots(figsize=(15, 5))
 
                     # Plot main bin values
-                    if len(all_bin_values_passed_bin_filled) > 0:
-                        ax1.plot(all_bin_values_passed_bin_filled, marker="o", markerfacecolor='none', linestyle="--", linewidth=1, color="dodgerblue", label="Missed Bin")
+                    if len(all_bin_values_passed_bin_filled_MB) > 0:
+                        ax1.plot(all_bin_values_passed_bin_filled_MB, marker="o", markerfacecolor='none', linestyle="--", linewidth=1, color="dodgerblue", label="Missed Bin")
 
-                    ax1.plot(all_bin_values, marker="o", linestyle="-", color="b", label="Bin Values")
+                    ax1.plot(all_bin_values_MB, marker="o", linestyle="-", color="b", label="Bin Values")
 
                     if len(bin_index_reset) > 0:
                         for i, idx in enumerate(bin_index_reset):
@@ -1400,12 +1323,12 @@ if SEARCH_RESULT:
                     for i, do_index in enumerate(search_do_bin_indices):
                         # if exit_search_bin_index <= 0 or do_index <= exit_search_bin_index:
                         search_x.append(do_index)
-                        search_y.append(all_bin_values[do_index])
-                        ax1.plot(do_index, all_bin_values[do_index], marker="o", color="purple", markersize=8,
+                        search_y.append(all_bin_values_MB[do_index])
+                        ax1.plot(do_index, all_bin_values_MB[do_index], marker="o", color="purple", markersize=8,
                                 label="SEARCH Update" if i == 0 else "")
 
                     ax1.set_xlabel("Bin Updates")
-                    ax1.set_ylabel("Bin Values (Mb)")
+                    ax1.set_ylabel("Value in each Bin (MB)")
                     ax1.set_title("Bins")
 
                     # Create a second y-axis
@@ -2145,6 +2068,131 @@ if SEARCH_RESULT:
     #             plt.grid(True)
     #             plt.savefig(os.path.join(fig_subfolder_path, f"cdf_delivery_rate_at_exit.png"))
     #             plt.close()
+            ################################ Plot CDF of needed_extra_bins_in_exit_list
+            needed_extra_bins_in_exit_list = [x for x in needed_extra_bins_in_exit_list if x is not None]
+            if needed_extra_bins_in_exit_list:
+                needed_extra_bins_in_exit_sorted = np.sort(needed_extra_bins_in_exit_list)
+                cdf = np.arange(1, len(needed_extra_bins_in_exit_sorted) + 1) / len(needed_extra_bins_in_exit_sorted)
+
+                plt.figure(figsize=(10, 5))
+                plt.plot(needed_extra_bins_in_exit_sorted, cdf, marker="o", linestyle="-", color="m")
+                plt.xlabel("Extra Bins in Exit time", fontsize=18)
+                plt.ylabel("Cumulative Distribution", fontsize=18)
+                plt.xticks(fontsize=14)
+                plt.yticks(fontsize=14)
+                plt.xlim(left=-0.2)
+                plt.ylim(bottom=-0.02)
+                # plt.title("CDF of Needed Extra Bins in Exit")
+                # plt.grid(True)
+                plt.savefig(os.path.join(fig_path, f"cdf_needed_extra_bins_in_exit_all_files.png"))
+                plt.close()
+
+            ################################ plot average cdf needed_extra_bins_to_do_search_dict
+            # Average CDF
+            if needed_extra_bins_to_do_search_dict:
+
+                # First find a common x-axis (e.g., union of all unique bins)
+                all_unique_bins = sorted(set(b for bins in needed_extra_bins_to_do_search_dict.values() for b in bins))
+                x_common = np.array(all_unique_bins)
+
+                # Interpolate individual CDFs onto common x-axis
+                cdf_values = []
+
+                for bins in needed_extra_bins_to_do_search_dict.values():
+                    sorted_bins = np.sort(bins)
+                    cdf = np.arange(1, len(sorted_bins)+1) / len(sorted_bins)
+                    f = interp1d(sorted_bins, cdf, kind='previous', bounds_error=False, fill_value=(0,1))
+                    interpolated = f(x_common)
+                    cdf_values.append(interpolated)
+
+                average_cdf = np.mean(cdf_values, axis=0)
+
+                plt.figure(figsize=(10, 5))
+                plt.plot(x_common, average_cdf, marker="o", linestyle="-", color="b")
+                plt.xlabel("Extra Bins to do SEARCH", fontsize=18)
+                plt.ylabel("Cumulative Distribution", fontsize=18)
+                plt.xticks(fontsize=14)
+                plt.yticks(fontsize=14)
+                plt.xlim(left=-0.2)
+                plt.ylim(bottom=-0.02)
+                plt.title("Average CDF of Needed Extra Bins to do SEARCH")
+                plt.savefig(os.path.join(fig_path, f"avg_cdf_needed_extra_bins_to_do_search_all_files.png"))
+                plt.close()
+
+            ########################## plot CDF for all extra bins to do SEARCH over allfiles
+            all_bins = []
+            for bins in needed_extra_bins_to_do_search_dict.values():
+                all_bins.extend(bins)
+
+            all_bins = np.sort(all_bins)
+            cdf_all = np.arange(1, len(all_bins)+1) / len(all_bins)
+
+            # Plot CDF of all bins
+            plt.figure(figsize=(10, 5))
+            plt.plot(all_bins, cdf_all, marker="o", linestyle="-", color="darkgreen")
+            plt.xlabel('Bins', fontsize=18)
+            plt.ylabel('CDF', fontsize=18)
+            plt.xticks(fontsize=14)
+            plt.yticks(fontsize=14)
+            plt.title('CDF of All Bins Needed (Across All Files)')
+            plt.legend()
+            plt.xlim(left=-0.2)
+            plt.ylim(bottom=-0.02)
+            plt.savefig(os.path.join(fig_path, f"cdf_needed_extra_bins_to_do_search_all_files.png"))
+            plt.close()   
+
+            ########################### plot cdf exit_time_output_list 
+            # if exit_time_output_list has any zero values, remove them as they are not exit cases
+            exit_time_output_list = [x for x in exit_time_output_list if x > 0]   
+
+            if exit_time_output_list:
+                exit_time_output_sorted = np.sort(exit_time_output_list)
+                cdf = np.arange(1, len(exit_time_output_sorted) + 1) / len(exit_time_output_sorted)
+
+                plt.figure(figsize=(10, 5))
+                plt.plot(exit_time_output_sorted, cdf, marker="o", linestyle="-", color="b")
+                plt.xlabel("Exit Time (s)", fontsize=18)
+                plt.ylabel("Cumulative Distribution", fontsize=18)
+                plt.xticks(fontsize=14)
+                plt.yticks(fontsize=14)
+                plt.xlim(left=0)
+                plt.ylim(bottom=0)
+                plt.title("CDF of Exit Time")
+                # plt.grid(True)
+                plt.savefig(os.path.join(fig_path, f"cdf_exit_time_output_list_{folder}.png"))
+                plt.close()
+
+            ########################### plot headrooms versus exit time
+            # plot headrooms versus exit time (x: exit time, y: headrooms)
+            headrooms_list = [x for x in headrooms_list if x is not None]
+            if headrooms_list and exit_time_output_list:
+                plt.figure(figsize=(10, 5))
+                plt.scatter(exit_time_output_list, headrooms_list, marker="o", color="b")
+                plt.xlabel("Exit Time (s)", fontsize=18)
+                plt.ylabel("Headrooms", fontsize=18)
+                plt.xticks(fontsize=14)
+                plt.yticks(fontsize=14)
+                plt.xlim(left=0)
+                plt.ylim(bottom=0)
+                plt.title("Headrooms vs Exit Time")
+                plt.savefig(os.path.join(fig_path, f"headrooms_vs_exit_time_{folder}.png"))
+                plt.close()
+
+            ########################## plot rtt_at_exit_list versus exit_time_output_list
+            rtt_at_exit_list = [x for x in rtt_at_exit_list if x is not None]
+            if rtt_at_exit_list and exit_time_output_list:
+                plt.figure(figsize=(10, 5))
+                plt.scatter(exit_time_output_list, rtt_at_exit_list, marker="o", color="b")
+                plt.xlabel("Exit Time (s)", fontsize=18)
+                plt.ylabel("RTT at Exit (ms)", fontsize=18)
+                plt.xticks(fontsize=14)
+                plt.yticks(fontsize=14)
+                plt.xlim(left=0)
+                plt.ylim(bottom=0)
+                plt.title("RTT at Exit vs Exit Time")
+                plt.savefig(os.path.join(fig_path, f"rtt_at_exit_vs_exit_time_{folder}.png"))
+                plt.close()
+
 
             ################################ plot delivery rate at loss and delivery rate at exit for all files of this folder in one plot
             plt.figure(figsize=(10, 5))
@@ -2224,8 +2272,8 @@ if SEARCH_RESULT:
 
                 abs_norm_diff = [x for x in abs_norm_diff if x is not None]
 
-                # remove abs_norm_diff > 0.2
-                abs_norm_diff = [x for x in abs_norm_diff if x <= 0.2]
+                # # remove abs_norm_diff > 0.2
+                # abs_norm_diff = [x for x in abs_norm_diff if x <= 0.2]
                 
                 if abs_norm_diff:
                     abs_norm_diff_sorted = np.sort(abs_norm_diff)
@@ -2242,8 +2290,6 @@ if SEARCH_RESULT:
                     plt.title("CDF of Absolute Normalized Difference")
                     plt.savefig(os.path.join(fig_path, f"cdf_abs_norm_diff_median_throughput_delivery_rate_exit_{folder}_new.png"))
                     plt.close()
-
-
 
             ########################## plot cdf time diff between exit time and loss time
             # find cdf of diff_over_rtt
