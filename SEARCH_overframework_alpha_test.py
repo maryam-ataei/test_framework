@@ -31,15 +31,15 @@ ANALYSIS_PCAP_FILE = True
 ANALYSIS_LOG_CSV = True
 
 cwd = os.getcwd()
-base_path = os.path.join(cwd, "/home/maryam/SEARCH/Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/data/data/testframework_output_fios_cable2/fios_cable2_window_bins_twenty_extra_forty")
-pcap_csv_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/data/data/pcap_server")
-log_csv_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/data/data/log_cubic/")
-fig_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/fios_cable/figs_fios_cable2_window_bins_twenty_extra_forty")
+base_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/4g_office/both_data/data/output_4G_office_off_default")
+pcap_csv_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/4g_office/both_data/data/pcap_server")
+log_csv_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/4g_office/both_data/data/log_cubic/")
+fig_path = os.path.join(cwd, "Linux/search_test/all_data/test_over_different_link_for_early_exit_problem/4g_office/figs_4g_office_default")
 os.makedirs(fig_path, exist_ok=True)
 
 config_output = None
 
-total_bins = 60 
+total_bins = 25
 
 ############################### Functions #########################################
 def get_data(file_path):
@@ -75,7 +75,8 @@ def get_data(file_path):
     reset_times = []
     needed_extra_bins_to_do_search = []
     needed_extra_bins_in_exit = None
-
+    # passed_bin = 0
+    needed_extra_bins = None
 
     for i, line in enumerate(lines):
         # # print(i)
@@ -103,8 +104,9 @@ def get_data(file_path):
         elif "Exit Slow Start at" in line:
             exit_time = int(re.search(r"Exit Slow Start at (\d+)", line).group(1)) * 1e-6 # Convert to seconds
             exit_time_list.append(exit_time)
-            exit_search_bin_index = ((len(all_bin_values))+passed_bin - 1) if len(all_bin_values) > 0 else 0   
-            needed_extra_bins_in_exit = needed_extra_bins      
+            exit_search_bin_index = ((len(all_bin_values))+passed_bin - 1) if len(all_bin_values) > 0 else 0  
+            if needed_extra_bins is not None: 
+                needed_extra_bins_in_exit = needed_extra_bins      
         elif "bytes_acked" in line:
             bytes_acked = int(re.search(r"bytes_acked: (\d+)", line).group(1)) * 1e-6 * 8 # Convert to Mb
             bytes_acked_list.append(bytes_acked)
@@ -476,11 +478,11 @@ if SEARCH_RESULT:
                 rtt_in_each_bin_update, time_each_bin_filled, reset_times, bin_end_time, \
                 needed_extra_bins_to_do_search, needed_extra_bins_in_exit = get_data(data_path)
 
-                # if loss does not happen, ignore the file (if there is no 1 in loss_happen_list)
-                if not any(loss_happen_list):
-                    print(f"File {data_path} has no loss")
-                    analysed_files -= 1
-                    continue
+                # # if loss does not happen, ignore the file (if there is no 1 in loss_happen_list)
+                # if not any(loss_happen_list):
+                #     print(f"File {data_path} has no loss")
+                #     analysed_files -= 1
+                #     continue
                 
                 ########################## Extra needeed bins dict ##########################
                 needed_extra_bins_in_exit_list.append(needed_extra_bins_in_exit)
@@ -573,8 +575,10 @@ if SEARCH_RESULT:
                             headrooms_list.append(diff_over_rtt)
                             diff_time_loss_exit.append(time_diff)
                         else:
-                            headrooms_list.append(None)
-                            diff_time_loss_exit.append(None)
+                            time_diff = now_list[-1] - exit_time
+                            diff_over_rtt = time_diff / rtt_at_exit
+                            headrooms_list.append(diff_over_rtt)
+                            diff_time_loss_exit.append(time_diff)
 
                         # Calculate time before RTT
                         time_pre_rtt = exit_time - rtt_at_exit
@@ -684,7 +688,11 @@ if SEARCH_RESULT:
                         loss = df_log["lost_pkt"]
                         
                         # limit data until first loss (or retrans)
-                        index_first_retrans = np.where(loss>0)[0][0]
+                        if any(loss>0):
+                            index_first_retrans = np.where(loss>0)[0][0]
+                        else:
+                            index_first_retrans = -1
+
                         if index_first_retrans > 0:
                             time_log = whole_time_log[:index_first_retrans]
                             tp_delivered_rate = tp_delivered_rate[:index_first_retrans]
@@ -695,7 +703,8 @@ if SEARCH_RESULT:
                             delivered_rate_at_loss_based_log = tp_delivery_rate_all.iloc[-1]  #Mb/s
                         else:
                             delivered_rate_at_loss_based_log = None
-
+                            time_log = whole_time_log
+                            tp_delivery_rate_all = tp_delivered_rate * 8 / tp_interval_us
                         if exit_time:
                             index_exit = np.where(np.asarray(time_log) >= exit_time)
                             if len(index_exit) > 0:
@@ -887,45 +896,45 @@ if SEARCH_RESULT:
                         plt.close()
 
 
-                        # find norm and graph
-                        norm_diff_based_window = (sent_bytes_window_last_rtt_interpolated - delivered_bytes_window) / sent_bytes_window_last_rtt_interpolated
+                        # # find norm and graph
+                        # norm_diff_based_window = (sent_bytes_window_last_rtt_interpolated - delivered_bytes_window) / sent_bytes_window_last_rtt_interpolated
 
-                        norm_diff_based_window[norm_diff_based_window < 0] = 0
+                        # norm_diff_based_window[norm_diff_based_window < 0] = 0
 
-                        # plot norm
-                        plt.figure(figsize=(8, 6))  
-                        plt.plot(time_window, norm_diff_based_window, marker = 'o', color="m", label="Normalized Difference")
-                        if exit_time:
-                            plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
-                        if loss_time:
-                            plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
-                        if exit_time and loss_time:
-                            max_event = max(exit_time, loss_time)
-                            plt.xlim(0, max_event + 0.1) 
-                            y_val = np.where(time_window <= max_event)[0]
-                            if len(y_val) > 0:
-                                plt.ylim(0, max(norm_diff_based_window[y_val[-1]], 0.35) + 0.05)
-                        elif exit_time:
-                            plt.xlim(0, exit_time + 0.1)
-                            y_val = np.where(time_window >= exit_time)[0]
-                            if len(y_val) > 0:
-                                plt.ylim(0, max(norm_diff_based_window[y_val[0]], 0.35) + 0.05)
-                        elif loss_time:
-                            plt.xlim(0, loss_time + 0.1)
-                            y_val = np.where(time_window >= loss_time)[0]
-                            if len(y_val) > 0:
-                                plt.ylim(0, max(norm_diff_based_window[:y_val[0]]) + 0.05)
+                        # # plot norm
+                        # plt.figure(figsize=(8, 6))  
+                        # plt.plot(time_window, norm_diff_based_window, marker = 'o', color="m", label="Normalized Difference")
+                        # if exit_time:
+                        #     plt.axvline(x=exit_time, color='lime', linestyle='--', label='Exit Time')
+                        # if loss_time:
+                        #     plt.axvline(x=loss_time, color='r', linestyle='--', label='Loss Time')
+                        # if exit_time and loss_time:
+                        #     max_event = max(exit_time, loss_time)
+                        #     plt.xlim(0, max_event + 0.1) 
+                        #     y_val = np.where(time_window <= max_event)[0]
+                        #     if len(y_val) > 0:
+                        #         plt.ylim(0, max(norm_diff_based_window[y_val[-1]], 0.35) + 0.05)
+                        # elif exit_time:
+                        #     plt.xlim(0, exit_time + 0.1)
+                        #     y_val = np.where(time_window >= exit_time)[0]
+                        #     if len(y_val) > 0:
+                        #         plt.ylim(0, max(norm_diff_based_window[y_val[0]], 0.35) + 0.05)
+                        # elif loss_time:
+                        #     plt.xlim(0, loss_time + 0.1)
+                        #     y_val = np.where(time_window >= loss_time)[0]
+                        #     if len(y_val) > 0:
+                        #         plt.ylim(0, max(norm_diff_based_window[:y_val[0]]) + 0.05)
                         
-                        plt.axhline(y=0.35, color='lightgray', linestyle='--', label='Threshold')
+                        # plt.axhline(y=0.35, color='lightgray', linestyle='--', label='Threshold')
 
-                        plt.xlabel("Time (s)", fontsize=18)
-                        plt.ylabel("Normalized Difference", fontsize=18)
-                        plt.title(f"Norm Between Estimated Sent and Delivered Bytes (wnd:3.5RTT) - {folder}", fontsize=12)  
-                        plt.xticks(fontsize=14)
-                        plt.yticks(fontsize=14)
-                        plt.legend(fontsize=14)
-                        plt.savefig(os.path.join(fig_subfolder_path, f"norm_diff_estimated_sent_delivered_bytes_window_{num+1}.png"))
-                        plt.close()
+                        # plt.xlabel("Time (s)", fontsize=18)
+                        # plt.ylabel("Normalized Difference", fontsize=18)
+                        # plt.title(f"Norm Between Estimated Sent and Delivered Bytes (wnd:3.5RTT) - {folder}", fontsize=12)  
+                        # plt.xticks(fontsize=14)
+                        # plt.yticks(fontsize=14)
+                        # plt.legend(fontsize=14)
+                        # plt.savefig(os.path.join(fig_subfolder_path, f"norm_diff_estimated_sent_delivered_bytes_window_{num+1}.png"))
+                        # plt.close()
 
                         # find diff total_sent_bytes and total_delv_bytes at time t
                         diff_total_sent_delv_bytes = total_bytes_sent - total_bytes_acked
@@ -1705,20 +1714,21 @@ if SEARCH_RESULT:
                                     plt.savefig(os.path.join(fig_subfolder_path, f"cdf_ack_size_packets_until_loss_{num+1}.png"))
                                     plt.close()
 
-                                    # plot ack size based on packet over time until loss    
-                                    plt.figure(figsize=(10, 5))
-                                    plt.plot(df['Time'][:index_loss], ack_diffs_packets[:index_loss], marker="o", linestyle="-", color="b")
-                                    if exit_time:
-                                        plt.axvline(exit_time, color="g", linestyle="--", label=f"Exit Time-based_{folder}")
-                                    plt.xlabel("Time (s)", fontsize=18)
-                                    plt.ylabel("Ack Size (packets)", fontsize=18)
-                                    plt.xticks(fontsize=14)
-                                    plt.yticks(fontsize=14)
-                                    plt.xlim(left=0)
-                                    plt.ylim(bottom=0)
-                                    # plt.title("Ack Size (packets) Over Time Until Loss")
-                                    plt.savefig(os.path.join(fig_subfolder_path, f"ack_size_packets_over_time_until_loss_{num+1}.png"))
-                                    plt.close()
+                                    # plot ack size based on packet over time until loss  
+                                    if len(df['Time'][:index_loss]) == len(ack_diffs_packets[:index_loss]): 
+                                        plt.figure(figsize=(10, 5))
+                                        plt.plot(df['Time'][:index_loss], ack_diffs_packets[:index_loss], marker="o", linestyle="-", color="b")
+                                        if exit_time:
+                                            plt.axvline(exit_time, color="g", linestyle="--", label=f"Exit Time-based_{folder}")
+                                        plt.xlabel("Time (s)", fontsize=18)
+                                        plt.ylabel("Ack Size (packets)", fontsize=18)
+                                        plt.xticks(fontsize=14)
+                                        plt.yticks(fontsize=14)
+                                        plt.xlim(left=0)
+                                        plt.ylim(bottom=0)
+                                        # plt.title("Ack Size (packets) Over Time Until Loss")
+                                        plt.savefig(os.path.join(fig_subfolder_path, f"ack_size_packets_over_time_until_loss_{num+1}.png"))
+                                        plt.close()
 
 
                 ####################### average throughput
@@ -1823,8 +1833,9 @@ if SEARCH_RESULT:
 
                 ####################### calculate success based on exit and power
                 success = False
-                if len(power_based_delivery_in_bins_list) > 0:
-                    max_power = np.max([x for x in power_based_delivery_in_bins_list if x is not None])
+                power_based_delivery_in_bins_list_no_none = [x for x in power_based_delivery_in_bins_list if x is not None]
+                if len(power_based_delivery_in_bins_list_no_none) > 0:
+                    max_power = np.max([x for x in power_based_delivery_in_bins_list_no_none if x is not None])
 
                     # Find the index of the max_power
                     max_power_index = np.where(np.array(power_based_delivery_in_bins_list) == max_power)[0][0]
@@ -1852,9 +1863,9 @@ if SEARCH_RESULT:
                     failure_not_exit_list.append(Failure_not_exit) # True if exit_search_bin_index is None
 
                 ####################### Calculate  success based on power prime
-
-                if len(power_prime_based_delivery_in_bins_list) > 0:
-                    max_power_prime = np.max([x for x in power_prime_based_delivery_in_bins_list if x is not None])
+                power_prime_based_delivery_in_bins_list_no_none = [x for x in power_prime_based_delivery_in_bins_list if x is not None]
+                if len(power_prime_based_delivery_in_bins_list_no_none) > 0:
+                    max_power_prime = np.max([x for x in power_prime_based_delivery_in_bins_list_no_none if x is not None])
 
                     # Find the index of the max_power
                     max_power_prime_index = np.where(np.array(power_prime_based_delivery_in_bins_list) == max_power_prime)[0][0]
@@ -1871,8 +1882,8 @@ if SEARCH_RESULT:
 
                     success_exit_based_power_prime_list.append(success)
                 ####################### Find max power before exit
-                if exit_search_bin_index > 0 and len(power_based_delivery_in_bins_list) > 0:
-                    max_power_before_exit = np.max([x for x in power_based_delivery_in_bins_list[:exit_search_bin_index] if x is not None])
+                if exit_search_bin_index > 0 and len(power_based_delivery_in_bins_list_no_none) > 0:
+                    max_power_before_exit = np.max([x for x in power_based_delivery_in_bins_list_no_none[:exit_search_bin_index] if x is not None])
                     max_power_before_exit_list.append(max_power_before_exit)
 
                 ####################### Calculate power over time based on delivery rate and rtt
@@ -2803,7 +2814,7 @@ if SEARCH_RESULT:
         'avg_successful_exit (%)': list(avg_success_exit_over_time_dict.values()),
         'avg_failure (Early) (%)': list(avg_failure_exit_less_max_over_time_dict.values()),
         'avg_failure (Late) (%)': list(avg_failure_not_exit_over_time_dict.values()),
-        'success_exit_when_ref_failed [ref: alpha100] (%)': list(success_when_ref_failed_over_time.values()),
+        # 'success_exit_when_ref_failed [ref: alpha100] (%)': list(success_when_ref_failed_over_time.values()),
         'avg_successful_exit_based_power_prime (%)': list(avg_success_exit_over_time_based_power_prime_dict.values()),
     }
 
