@@ -313,6 +313,7 @@ def generate_files(input_file, keyword):
                 r'__maybe_unused':'',
                 r'__section__': '',
                 r'__read_mostly': '',
+                r'__bpf_kfunc static': '',
             }
 
             module_content = apply_replacements(module_content, replacements)
