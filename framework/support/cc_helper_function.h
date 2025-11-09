@@ -150,6 +150,29 @@ static inline u32 tcp_min_rtt(const struct tcp_sock *tp) {
     return 500; // Fake minimum RTT value (adjust if needed)
 }
 
+/* --------------------------------------------------------------------------
+ * Fake TCP Congestion Control Functions (no-op stubs)
+ * -------------------------------------------------------------------------- */
+
+/* These functions are provided only to satisfy linkage during user-space tests.
+ * They do NOT modify the tcp_sock structure or simulate congestion control.
+ */
+
+static inline void tcp_slow_start(struct tcp_sock *tp, u32 acked)
+{
+    (void)tp;
+    (void)acked;
+    /* no-op */
+}
+
+static inline void tcp_cong_avoid_ai(struct tcp_sock *tp, int division_factor, u32 acked)
+{
+    (void)tp;
+    (void)division_factor;
+    (void)acked;
+    /* no-op */
+}
+
 static u32 minmax_subwin_update(struct minmax *m, u32 win, struct minmax_sample *val)
 {
     if (val->t - m->s[0].t > win / 4)

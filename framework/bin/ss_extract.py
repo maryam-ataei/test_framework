@@ -314,6 +314,7 @@ def generate_files(input_file, keyword):
                 r'__section__': '',
                 r'__read_mostly': '',
                 r'__bpf_kfunc static': '',
+                r'__bpf_kfunc': ''
             }
 
             module_content = apply_replacements(module_content, replacements)
@@ -351,6 +352,7 @@ def generate_files(input_file, keyword):
                 # Write the module content
                 includes = textwrap.dedent(f"""\
                     #include <string.h>
+                    #include <stddef.h> 
                     #include "tcp.h"
                     #include "{keyword}_defs.h"
                     #include "cc_helper_function.h"
