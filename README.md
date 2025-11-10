@@ -23,7 +23,16 @@ Organized to automate testing with different TCP source files and alpha tuning v
 Module focused on testing NewReno with SEARCH enhancements.
 
 - `bin/`, `support/`: Same structure as `framework/`
-- `cc_newreno_search.c`, `cc_newreno_search.h`: original cc files with labels
+- `original cc files with labels/`: Stores original congestion control source files that are labeled for each CC test (cc_newreno_search)
+
+#### ⚠️ FreeBSD Header File Requirement
+In FreeBSD, each congestion control (CC) algorithm has an associated header (`.h`) file.  
+Before compiling, make sure to **copy the corresponding `.h` file from the kernel source** into the `test_dir/`.
+
+**Example:**
+```bash
+cp /usr/src/sys/netinet/cc/cc_newreno_search.h test_dir/
+```
 ---
 
 ## 🧪 Core Utility Scripts (`bin/`)
