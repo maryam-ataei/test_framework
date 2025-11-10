@@ -105,6 +105,6 @@ Runs the compiled test binary (`test_<keyword>`) on all `.csv` trace files in th
 
 **Usage**:
 ```bash
-python3 ss_run.py -f test directory -k SEARCH -i input_path -o output_path
+python3 ss_run.py -f test_directory -k SEARCH -i input_path -o output_path
 ```
 ---
