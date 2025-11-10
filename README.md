@@ -70,6 +70,14 @@ Prepares the test environment by copying support and test files into `test_dir/`
 ```bash
 python3 ss_setup.py -k SEARCH
 ```
+#### ⚠️ Kernel-Version-Specific Test Files
+For some algorithms, the test file depends on the kernel version. Check the `support/` folder to find the correct `test_<keyword>.c` file that matches your source file.  
+For example, the HyStart algorithm has separate source files for different kernels (`tcp_cubic_hystart_kern5_10.c` and `tcp_cubic_hystart_kern6_13.c`), with corresponding test files `test_hystart_kern5_10.c` and `test_hystart_kern6_13.c` in the `support/` folder.
+
+**Example:**
+```bash
+python3 ss_setup.py -k hystart_kern5_10
+```
 
 ### 📄 Make file
 Purpose:
@@ -92,7 +100,10 @@ Runs the compiled test binary (`test_<keyword>`) on all `.csv` trace files in th
   - Executes the test binary
   - Redirects the output to a `.txt` file in the output folder
 
-
+**Usage**:
+```bash
+python3 ss_run.py -f test directory -k SEARCH -i input_path -o output_path
+```
 ---
 
 ## 📊 Evaluation and Batch Testing Scripts
