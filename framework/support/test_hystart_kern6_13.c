@@ -67,7 +67,6 @@ int main(int argc, char *argv[]) {
     tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
     int EXIT_FLAG = 0;
     int LOSS_FLAG = 0;
-    u32 prev_snd_una = 0;
 
     char line[256];
     int line_number = 0;
@@ -101,6 +100,7 @@ int main(int argc, char *argv[]) {
 
         /* Update the TCP socket state with the current input values */
         tp->snd_nxt = snd_nxt;
+        tp->snd_una = snd_una;
         sk->sk_pacing_rate = sk_pacing_rate;
 
         /* Use RTT sample from input; ensure non-zero delay 
@@ -131,12 +131,6 @@ int main(int argc, char *argv[]) {
                 printf("curr_rtt %llu\n", ca->curr_rtt);
         }
 
-        if (line_number == 2)
-            tp->snd_una = snd_una - mss;
-        else 
-            tp->snd_una = prev_snd_una;
-
-        prev_snd_una = snd_una;
         /*
          * Detect and flag the presence of packet loss during the flow.
          * Only set LOSS_FLAG once (when loss is first seen).
