@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
         if (line_number == 2 && line[0] != '#') {
             initial_seq = snd_nxt - (11 * mss);
             first_ack_seq = snd_nxt;
-            ca->end_seq = snd_nxt;
+            bictcp_hystart_reset(sk); 
         }
 
         /*
@@ -163,7 +163,6 @@ int main(int argc, char *argv[]) {
         // -----------------------------------------------------------------------------     
         /* Trigger HyStart */
         hystart_update(sk, delay);
-
         // -----------------------------------------------------------------------------
         // ⚠ USER NOTE: Print results and info based on your requirements.
         // -----------------------------------------------------------------------------
