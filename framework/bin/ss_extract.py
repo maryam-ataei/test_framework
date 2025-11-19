@@ -256,9 +256,23 @@ def generate_tcp_h(module_file, module_defs_file):
         struct_definitions = []
         for struct_name in sorted_structs:
             fields = extracted_fields[struct_name]
-            struct_body = "\n".join([f"    u64 {field};" if " " not in field else f"    {field};" for field in fields])
-            struct_definitions.append(f"struct {struct_name} {{\n{struct_body}\n}};\n")
 
+            # --- ADD DEFAULT TCP FIELDS FOR tcp_sock ---
+            if struct_name == "tcp_sock":
+                # Only insert if missing
+                if not any("snd_cwnd" in f for f in fields):
+                    fields.append("u32 snd_cwnd")
+                if not any("snd_ssthresh" in f for f in fields):
+                    fields.append("u32 snd_ssthresh")
+
+            # Build struct body
+            struct_body = "\n".join([
+                f"    u64 {field};" if " " not in field else f"    {field};"
+                for field in fields
+            ])
+
+            struct_definitions.append(f"struct {struct_name} {{\n{struct_body}\n}};\n")
+    
         # Step 4: Generate detected macros dynamically
         macro_definitions = []
         for macro, struct_type in struct_macros.items():
