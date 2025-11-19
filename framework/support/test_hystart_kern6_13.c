@@ -67,6 +67,7 @@ int main(int argc, char *argv[]) {
     tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
     int EXIT_FLAG = 0;
     int LOSS_FLAG = 0;
+    u32 prev_snd_una = 0;
 
     char line[256];
     int line_number = 0;
@@ -88,12 +89,13 @@ int main(int argc, char *argv[]) {
         // -----------------------------------------------------------------------------
                     
         // Variables to store parsed values
-        u32 now_us, mss, rtt_us, tp_rate_interval_us, app_limited, tp_delivered_rate, tp_delivered, lost, retrans, snd_nxt, snd_una, sk_pacing_rate;
-        u64 bytes_acked;
+        u32 now_us, mss, rtt_us, tp_rate_interval_us, app_limited, tp_delivered_rate, tp_delivered, lost, retrans, sk_pacing_rate;
+        u64 bytes_acked, snd_nxt, snd_una;
+        double snd_cwnd;
 
         // Parse the CSV line
-        if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u, %u, %u, %u", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
-                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate, &snd_una) != 13) {
+        if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u, %llu, %u, %lf, %llu", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
+                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate, &snd_cwnd, &snd_una) != 14) {
             fprintf(stderr, "Invalid line format at line %d: %s", line_number, line);
             continue;
         }
@@ -102,6 +104,7 @@ int main(int argc, char *argv[]) {
         tp->snd_nxt = snd_nxt;
         tp->snd_una = snd_una;
         sk->sk_pacing_rate = sk_pacing_rate;
+        tcp_snd_cwnd(tp) = (u32)snd_cwnd;
 
         /* Use RTT sample from input; ensure non-zero delay 
          *  (avoid divide-by-zero or meaningless results)
@@ -118,17 +121,12 @@ int main(int argc, char *argv[]) {
 
         /* 
          * Initialize the connection state during the first data row.
-         * Estimate the initial sequence number based on snd_nxt and number of sent segments.
-         * - Assumes 11 segments (e.g., based on sent packet=11 at the time of first ack).
-         * - Sets initial_seq for later ACK sequence tracking.
-         * - Sets first_ack_seq for HyStart cwnd comparison.
+         * Estimate the end sequence number based on snd_nxt and number of sent segments.
+         * - Assumes 10 segments (e.g., based on sent packet=10 at the time of first ack).
          * - Sets ca->end_seq as the expected boundary for the current round.
          */
         if (line_number == 2 && line[0] != '#') {
-                ca->round_start = ca->last_ack = bictcp_clock_us(sk);
-                ca->end_seq = tp->snd_nxt;
-                ca->curr_rtt = ~0U;
-                printf("curr_rtt %llu\n", ca->curr_rtt);
+            ca->end_seq = snd_nxt - (10 * mss);           
         }
 
         /*
@@ -165,6 +163,7 @@ int main(int argc, char *argv[]) {
         printf("  round_start: %u\n", ca->round_start);
         printf("  app_limited: %u\n", app_limited);
         printf("  loss happen: %u\n", LOSS_FLAG);
+        printf("  snd_una: %u\n", tp->snd_una);
 
         printf("\n");
     }

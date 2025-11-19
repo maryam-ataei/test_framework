@@ -165,6 +165,11 @@ static inline void tcp_slow_start(struct tcp_sock *tp, u32 acked)
     /* no-op */
 }
 
+/* Proper user-space replacement for Linux kernel tcp_snd_cwnd() */
+#ifndef tcp_snd_cwnd
+#define tcp_snd_cwnd(tp)    ((tp)->snd_cwnd)
+#endif
+
 static inline void tcp_cong_avoid_ai(struct tcp_sock *tp, int division_factor, u32 acked)
 {
     (void)tp;
