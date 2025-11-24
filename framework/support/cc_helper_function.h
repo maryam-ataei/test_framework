@@ -154,24 +154,43 @@ static inline u32 tcp_min_rtt(const struct tcp_sock *tp) {
  * Fake TCP Congestion Control Functions (no-op stubs)
  * -------------------------------------------------------------------------- */
 
-/* These functions are provided only to satisfy linkage during user-space tests.
- * They do NOT modify the tcp_sock structure or simulate congestion control.
- */
-
-static inline void tcp_slow_start(struct tcp_sock *tp, u32 acked)
+static inline u32 tcp_slow_start(struct tcp_sock *tp, u32 acked)
 {
-    (void)tp;
-    (void)acked;
-    /* no-op */
+    u32 cwnd = tp->snd_cwnd;
+    u32 ssthresh = tp->snd_ssthresh;
+
+    /* cwnd += acked, but cap at ssthresh */
+    u32 new_cwnd = cwnd + acked;
+    if (new_cwnd > ssthresh)
+        new_cwnd = ssthresh;
+
+    /* how many ACKs consumed */
+    u32 consumed = new_cwnd - cwnd;
+    acked -= consumed;
+
+    /* update cwnd */
+    tp->snd_cwnd = new_cwnd;
+
+    return acked;  /* leftover for congestion avoidance */
 }
 
-static inline void tcp_cong_avoid_ai(struct tcp_sock *tp, int division_factor, u32 acked)
+static inline void tcp_cong_avoid_ai(struct tcp_sock *tp, u32 w, u32 acked)
 {
-    (void)tp;
-    (void)division_factor;
-    (void)acked;
-    /* no-op */
+    tp->snd_cwnd_cnt += acked;
+
+    if (tp->snd_cwnd_cnt >= w) {
+        u32 delta = tp->snd_cwnd_cnt / w;
+        tp->snd_cwnd_cnt -= delta * w;
+        tp->snd_cwnd += delta;
+    }
 }
+
+
+/* Proper user-space replacement for Linux kernel tcp_snd_cwnd() */
+#ifndef tcp_snd_cwnd
+#define tcp_snd_cwnd(tp)    ((tp)->snd_cwnd)
+#endif
+
 
 static u32 minmax_subwin_update(struct minmax *m, u32 win, struct minmax_sample *val)
 {
