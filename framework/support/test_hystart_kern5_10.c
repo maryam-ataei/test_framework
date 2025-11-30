@@ -64,6 +64,7 @@ int main(int argc, char *argv[]) {
     bictcp_hystart_reset(sk);            
 
     // Initialize protocol-specific variables
+    int hystart_low_window  = 16;
     tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
     tp->snd_cwnd = TCP_INIT_CWND;
     int EXIT_FLAG = 0;
@@ -94,12 +95,12 @@ int main(int argc, char *argv[]) {
         // -----------------------------------------------------------------------------
                     
         // Variables to store parsed values
-        u32 now_us, mss, rtt_us, tp_rate_interval_us, app_limited, tp_delivered_rate, tp_delivered, lost, retrans, snd_nxt, sk_pacing_rate;
-        u64 bytes_acked;
+        u32 now_us, mss, rtt_us, tp_rate_interval_us, app_limited, tp_delivered_rate, tp_delivered, lost, retrans, sk_pacing_rate;
+        u64 bytes_acked, snd_nxt, snd_cwnd;
 
         // Parse the CSV line
-        if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u, %u, %u", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
-                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate) != 12) {
+        if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u, %llu, %u, %llu", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
+                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate, &snd_cwnd) != 13) {
             fprintf(stderr, "Invalid line format at line %d: %s", line_number, line);
             continue;
         }
@@ -107,7 +108,23 @@ int main(int argc, char *argv[]) {
         /* Update the TCP socket state with the current input values */
         tp->snd_nxt = snd_nxt;
         sk->sk_pacing_rate = sk_pacing_rate;
+        tp->snd_cwnd = snd_cwnd;
 
+
+        /* 
+         * Initialize the connection state during the first data row.
+         * Estimate the initial sequence number based on snd_nxt and number of sent segments.
+         * - Assumes 10 segments (e.g., based on sent packet=10 at the time of first ack).
+         * - Sets initial_seq for later ACK sequence tracking.
+         * - Sets first_ack_seq for HyStart cwnd comparison.
+         * - Sets ca->end_seq as the expected boundary for the current round.
+         */
+        if (line_number == 2 && line[0] != '#') {
+            initial_seq = snd_nxt - (10 * mss);
+            first_ack_seq = snd_nxt;
+            ca->end_seq = initial_seq;
+        }
+        
         /* Use RTT sample from input; ensure non-zero delay 
          *  (avoid divide-by-zero or meaningless results)
          */
@@ -121,19 +138,14 @@ int main(int argc, char *argv[]) {
         if (ca->delay_min == 0 || ca->delay_min > delay)
             ca->delay_min = delay;
 
-        /* 
-         * Initialize the connection state during the first data row.
-         * Estimate the initial sequence number based on snd_nxt and number of sent segments.
-         * - Assumes 11 segments (e.g., based on sent packet=11 at the time of first ack).
-         * - Sets initial_seq for later ACK sequence tracking.
-         * - Sets first_ack_seq for HyStart cwnd comparison.
-         * - Sets ca->end_seq as the expected boundary for the current round.
-         */
-        if (line_number == 2 && line[0] != '#') {
-            initial_seq = snd_nxt - (11 * mss);
-            first_ack_seq = snd_nxt;
-            bictcp_hystart_reset(sk); 
-        }
+        // Call protocol-specific update functions
+        // -----------------------------------------------------------------------------
+        // ⚠ USER NOTE: Call the function(s) to start running your protocol.
+        // -----------------------------------------------------------------------------
+
+        /* Trigger HyStart */
+        if (tp->snd_cwnd >= hystart_low_window)
+            hystart_update(sk, delay);
 
         /*
          * Compute the current ACKed sequence number using initial_seq and cumulative bytes_acked.
@@ -147,8 +159,13 @@ int main(int argc, char *argv[]) {
          * If so, reset the round state using bictcp_hystart_reset(), which sets a new end_seq.
          */
         if (after(ack_seq, ca->end_seq)) {
+            printf("reset happen. ack_seq %u and ca->end_seq %u\n", ack_seq, ca->end_seq);
             bictcp_hystart_reset(sk);
         }
+
+        // -----------------------------------------------------------------------------
+        // ⚠ USER NOTE: Print results and info based on your requirements.
+        // -----------------------------------------------------------------------------
 
         /*
          * Detect and flag the presence of packet loss during the flow.
@@ -157,15 +174,6 @@ int main(int argc, char *argv[]) {
         if (LOSS_FLAG == 0 && lost > 0)
             LOSS_FLAG = 1;
         
-        // Call protocol-specific update functions
-        // -----------------------------------------------------------------------------
-        // ⚠ USER NOTE: Call the function(s) to start running your protocol.
-        // -----------------------------------------------------------------------------     
-        /* Trigger HyStart */
-        hystart_update(sk, delay);
-        // -----------------------------------------------------------------------------
-        // ⚠ USER NOTE: Print results and info based on your requirements.
-        // -----------------------------------------------------------------------------
 
         if (ca->found && EXIT_FLAG == 0) {
             printf("HyStart Exits Slow Phase at %u us\n", now_us);
@@ -183,7 +191,10 @@ int main(int argc, char *argv[]) {
         printf("  round_start: %u\n", ca->round_start);
         printf("  app_limited: %u\n", app_limited);
         printf("  loss happen: %u\n", LOSS_FLAG);
-
+        printf("  ack_seq: %u\n", ack_seq);
+        printf("  initial_seq: %u\n", initial_seq);
+        printf("  bytes_acked: %u\n", bytes_acked);
+        printf("  snd_cwnd: %u\n", tp->snd_cwnd);
         printf("\n");
     }
     // Clean up memory

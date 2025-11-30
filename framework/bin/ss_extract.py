@@ -206,10 +206,14 @@ def generate_tcp_h(module_file, module_defs_file):
             #define TCP_H
 
             #include <stdint.h>
-            #include "cc_helper_function.h"
             """)
 
         tcp_needed_definitions = textwrap.dedent("""\
+            typedef unsigned int       u32;
+            typedef unsigned long long u64;
+            typedef unsigned short     u16;
+            typedef unsigned char      u8;
+
             #define TCP_INIT_CWND 10
             #define TCP_INFINITE_SSTHRESH   0x7fffffff
         """)
@@ -496,7 +500,7 @@ def generate_makefile(keyword):
 CC = {cc}
 CFLAGS = {cflags}
 EXEC = {executable_name}
-SRC = {keyword}_module.c test_{keyword}.c
+SRC = {keyword}_module.c $(wildcard test_{keyword}*.c)
 
 # The default rule
 all: $(EXEC)

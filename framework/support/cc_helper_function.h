@@ -13,6 +13,7 @@
 #ifndef CC_HELPER_FUNCTION_H
 #define CC_HELPER_FUNCTION_H
 
+#include "tcp.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -144,15 +145,10 @@ static inline void update_jiffies() {
 }
 
 /* Define a fake placeholder function that compiles but does nothing */
-struct tcp_sock; // Forward declaration
 static inline u32 tcp_min_rtt(const struct tcp_sock *tp) {
     (void)tp; // Prevents "unused parameter" warnings
     return 500; // Fake minimum RTT value (adjust if needed)
 }
-
-/* --------------------------------------------------------------------------
- * Fake TCP Congestion Control Functions (no-op stubs)
- * -------------------------------------------------------------------------- */
 
 static inline u32 tcp_slow_start(struct tcp_sock *tp, u32 acked)
 {
@@ -176,6 +172,11 @@ static inline u32 tcp_slow_start(struct tcp_sock *tp, u32 acked)
 
 static inline void tcp_cong_avoid_ai(struct tcp_sock *tp, u32 w, u32 acked)
 {
+    if (tp->snd_cwnd_cnt >= w) {
+        tp->snd_cwnd_cnt = 0;
+        tp->snd_cwnd = tp->snd_cwnd + 1;
+    }
+
     tp->snd_cwnd_cnt += acked;
 
     if (tp->snd_cwnd_cnt >= w) {
@@ -191,6 +192,10 @@ static inline void tcp_cong_avoid_ai(struct tcp_sock *tp, u32 w, u32 acked)
 #define tcp_snd_cwnd(tp)    ((tp)->snd_cwnd)
 #endif
 
+static inline bool tcp_in_slow_start(const struct tcp_sock *tp)
+{
+    return tp->snd_cwnd < tp->snd_ssthresh;
+}
 
 static u32 minmax_subwin_update(struct minmax *m, u32 win, struct minmax_sample *val)
 {

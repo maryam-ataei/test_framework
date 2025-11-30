@@ -85,6 +85,7 @@ int main(int argc, char *argv[]) {
     tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
     tp->snd_cwnd = TCP_INIT_CWND;
     int LOSS_FLAG = 0;
+    u32 pre_acked = 0;
 
     char line[256];
     int line_number = 0;
@@ -111,7 +112,7 @@ int main(int argc, char *argv[]) {
 
         // Parse the CSV line
         if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u, %u, %u, %u", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
-                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate, &snd_una) != 13) {
+                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate,&snd_una) != 13) {
             fprintf(stderr, "Invalid line format at line %d: %s", line_number, line);
             continue;
         }                   
@@ -127,7 +128,14 @@ int main(int argc, char *argv[]) {
         sk->sk_pacing_rate = sk_pacing_rate;
 
         u32 acked;
-        acked = bytes_acked;
+        u32 delta_ack_pkt;
+        u32 cumulative_ack_pkts;
+
+        cumulative_ack_pkts = bytes_acked / mss;
+        delta_ack_pkt = cumulative_ack_pkts - pre_acked;
+        acked = delta_ack_pkt;
+
+        pre_acked = cumulative_ack_pkts;
 
         if (line_number == 2 && line[0] != '#') {
             ca->hspp_end_seq = tp->snd_nxt;
@@ -156,10 +164,12 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        hystartpp_adjust_params(sk, delay);
+
+        if (tcp_in_slow_start(tp) && (ca->hspp_flag != HSPP_DEACTIVE))
+            hystartpp_adjust_params(sk, delay);
+
         if (ca->hspp_flag != HSPP_DEACTIVE)
             hystartpp_adjust_cwnd(sk, acked);
-
         // -----------------------------------------------------------------------------
         // ⚠ USER NOTE: Print results and info based on your requirements.
         // -----------------------------------------------------------------------------
@@ -176,6 +186,9 @@ int main(int argc, char *argv[]) {
         printf("  hspp_flag: %u\n", ca->hspp_flag);
         printf("  snd_una: %u\n", tp->snd_una);
         printf("  loss happen: %u\n", LOSS_FLAG);
+        printf("  snd_cwnd: %u\n", tp->snd_cwnd);
+        printf("  snd_cwnd_cnt: %u\n", tp->snd_cwnd_cnt);
+
 
         printf("\n");        
 
