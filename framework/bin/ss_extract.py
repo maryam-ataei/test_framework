@@ -206,10 +206,14 @@ def generate_tcp_h(module_file, module_defs_file):
             #define TCP_H
 
             #include <stdint.h>
-            #include "cc_helper_function.h"
             """)
 
         tcp_needed_definitions = textwrap.dedent("""\
+            typedef unsigned int       u32;
+            typedef unsigned long long u64;
+            typedef unsigned short     u16;
+            typedef unsigned char      u8;
+
             #define TCP_INIT_CWND 10
             #define TCP_INFINITE_SSTHRESH   0x7fffffff
         """)
@@ -255,8 +259,8 @@ def generate_tcp_h(module_file, module_defs_file):
         # Step 3: Generate structure definitions dynamically
         struct_definitions = []
         for struct_name in sorted_structs:
-            fields = extracted_fields[struct_name]
-
+            fields = list(extracted_fields[struct_name])  # <-- convert set → list
+            
             # --- ADD DEFAULT TCP FIELDS FOR tcp_sock ---
             if struct_name == "tcp_sock":
                 # Only insert if missing
@@ -264,6 +268,8 @@ def generate_tcp_h(module_file, module_defs_file):
                     fields.append("u32 snd_cwnd")
                 if not any("snd_ssthresh" in f for f in fields):
                     fields.append("u32 snd_ssthresh")
+                if not any("snd_cwnd_cnt" in f for f in fields):
+                    fields.append("u32 snd_cwnd_cnt")
 
             # Build struct body
             struct_body = "\n".join([
@@ -272,7 +278,7 @@ def generate_tcp_h(module_file, module_defs_file):
             ])
 
             struct_definitions.append(f"struct {struct_name} {{\n{struct_body}\n}};\n")
-    
+
         # Step 4: Generate detected macros dynamically
         macro_definitions = []
         for macro, struct_type in struct_macros.items():
@@ -494,7 +500,7 @@ def generate_makefile(keyword):
 CC = {cc}
 CFLAGS = {cflags}
 EXEC = {executable_name}
-SRC = {keyword}_module.c test_{keyword}.c
+SRC = {keyword}_module.c $(wildcard test_{keyword}*.c)
 
 # The default rule
 all: $(EXEC)

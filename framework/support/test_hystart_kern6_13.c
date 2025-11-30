@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
 
         // Parse the CSV line
         if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u, %llu, %u, %lf, %llu", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
-                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate, &snd_cwnd, &snd_una) != 14) {
+                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate, &snd_una, &snd_cwnd) != 14) {
             fprintf(stderr, "Invalid line format at line %d: %s", line_number, line);
             continue;
         }

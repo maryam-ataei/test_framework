@@ -85,6 +85,7 @@ int main(int argc, char *argv[]) {
     tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
     tp->snd_cwnd = TCP_INIT_CWND;
     int LOSS_FLAG = 0;
+    u32 pre_acked = 0;
 
     char line[256];
     int line_number = 0;
@@ -127,7 +128,14 @@ int main(int argc, char *argv[]) {
         sk->sk_pacing_rate = sk_pacing_rate;
 
         u32 acked;
-        acked = bytes_acked;
+        u32 delta_ack_pkt;
+        u32 cumulative_ack_pkts;
+
+        cumulative_ack_pkts = bytes_acked / mss;
+        delta_ack_pkt = cumulative_ack_pkts - pre_acked;
+        acked = delta_ack_pkt;
+
+        pre_acked = cumulative_ack_pkts;
 
         if (line_number == 2 && line[0] != '#') {
             ca->hspp_end_seq = tp->snd_nxt;
@@ -135,6 +143,7 @@ int main(int argc, char *argv[]) {
             ca->hspp_last_round_minrtt = ca->hspp_current_round_minrtt; /* {RFC9406_L186} */
             ca->hspp_current_round_minrtt = ~0U;                /* {RFC9406_L187} */
             ca->hspp_flag = HSPP_IN_SS;
+            acked = 0;
         }
         
         /* Use RTT sample from input; ensure non-zero delay 
@@ -156,10 +165,12 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        hystartpp_adjust_params(sk, delay);
+
+        if (tcp_in_slow_start(tp) && (ca->hspp_flag != HSPP_DEACTIVE))
+            hystartpp_adjust_params(sk, delay);
+
         if (ca->hspp_flag != HSPP_DEACTIVE)
             hystartpp_adjust_cwnd(sk, acked);
-
         // -----------------------------------------------------------------------------
         // ⚠ USER NOTE: Print results and info based on your requirements.
         // -----------------------------------------------------------------------------
@@ -176,6 +187,9 @@ int main(int argc, char *argv[]) {
         printf("  hspp_flag: %u\n", ca->hspp_flag);
         printf("  snd_una: %u\n", tp->snd_una);
         printf("  loss happen: %u\n", LOSS_FLAG);
+        printf("  snd_cwnd: %u\n", tp->snd_cwnd);
+        printf("  snd_cwnd_cnt: %u\n", tp->snd_cwnd_cnt);
+
 
         printf("\n");        
 
