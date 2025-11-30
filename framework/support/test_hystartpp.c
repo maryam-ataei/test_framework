@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
 
         // Parse the CSV line
         if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u, %u, %u, %u", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
-                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate,&snd_una) != 13) {
+                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate, &snd_una) != 13) {
             fprintf(stderr, "Invalid line format at line %d: %s", line_number, line);
             continue;
         }                   
@@ -143,6 +143,7 @@ int main(int argc, char *argv[]) {
             ca->hspp_last_round_minrtt = ca->hspp_current_round_minrtt; /* {RFC9406_L186} */
             ca->hspp_current_round_minrtt = ~0U;                /* {RFC9406_L187} */
             ca->hspp_flag = HSPP_IN_SS;
+            acked = 0;
         }
         
         /* Use RTT sample from input; ensure non-zero delay 
