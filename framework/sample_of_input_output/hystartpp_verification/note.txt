@@ -1,9 +1,0 @@
-This folder contains sample CSV data captured from the Linux TCP CUBIC
-implementation with HyStart enabled on kernel version 6.13.
-
-These CSV traces include two additional columns at the end of each row:
-  - snd_cwnd
-  - snd_ssthresh
-
-These extra fields allow direct verification of HyStart++ behavior and
-enable comparison with the previous HyStart algorithm in kernel 6.13.

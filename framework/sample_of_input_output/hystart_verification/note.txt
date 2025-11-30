@@ -1,0 +1,13 @@
+This folder contains sample CSV data captured from the Linux TCP CUBIC
+implementation with HyStart enabled on kernel version 6.13.
+
+This folder contains CSV input files for testing the following HyStart
+implementations:
+
+  • HyStart++  
+  • HyStart (kernel 5.10)  
+  • HyStart (kernel 6.13)  
+
+For additional validation, the folder `verification_csv` contains
+corresponding kernel-level logs. These can be used to cross-check results
+produced by your test framework.
