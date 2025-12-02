@@ -5,8 +5,8 @@ implementations:
   • HyStart (kernel 5.10)  
   • HyStart (kernel 6.13)  
 
-All CSV inputs were generated from the **same packet capture runs**, taken
-while using `tcp_cubic.c` with **HyStart disabled** on Linux kernel 6.13.
+All CSV inputs were taken while using `tcp_cubic.c` with 
+**HyStart disabled** on Linux kernel 6.13.
 This ensures that every congestion control variant receives identical
 input conditions, allowing fair and consistent comparison.
 

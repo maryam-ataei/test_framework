@@ -1,6 +1,3 @@
-This folder contains sample CSV data captured from the Linux TCP CUBIC
-implementation with HyStart enabled on kernel version 6.13.
-
 This folder contains CSV input files for testing the following HyStart
 implementations:
 
@@ -8,6 +5,19 @@ implementations:
   • HyStart (kernel 5.10)  
   • HyStart (kernel 6.13)  
 
+All CSV inputs captured from the Linux TCP CUBIC
+implementation with HyStart enabled on kernel version 6.13.
+This ensures that every congestion control variant receives identical
+input conditions, allowing fair and consistent comparison.
+
 For additional validation, the folder `verification_csv` contains
 corresponding kernel-level logs. These can be used to cross-check results
-produced by your test framework.
+produced by your test framework and confirm correctness of cwnd, RTT,
+and loss-related behaviors.
+
+
+This dataset can be used both to validate the test framework’s correctness
+for HyStart (kernel 6.13) and to compare the behavior across different HyStart
+kernel versions—HyStart (5.10), HyStart (6.13), and HyStart++. 
+In particular, it enables consistent evaluation of key metrics such as cwnd growth
+and exit timing, with kernel 6.13 serving as the reference baseline.

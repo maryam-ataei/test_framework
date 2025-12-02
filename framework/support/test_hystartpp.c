@@ -143,7 +143,6 @@ int main(int argc, char *argv[]) {
             ca->hspp_last_round_minrtt = ca->hspp_current_round_minrtt; /* {RFC9406_L186} */
             ca->hspp_current_round_minrtt = ~0U;                /* {RFC9406_L187} */
             ca->hspp_flag = HSPP_IN_SS;
-            acked = 0;
         }
         
         /* Use RTT sample from input; ensure non-zero delay 
@@ -161,13 +160,18 @@ int main(int argc, char *argv[]) {
 
         if (LOSS_FLAG == 0 && lost > 0){
             LOSS_FLAG = 1;
-            printf("First Loss is happened\n");
-            break;
+            printf("First Loss is happened at %u us\n", now_us);
         }
-
 
         if (tcp_in_slow_start(tp) && (ca->hspp_flag != HSPP_DEACTIVE))
             hystartpp_adjust_params(sk, delay);
+
+        // Print details
+        // This is aligned with the kernel log order, where CWND is logged prior to ACK-driven updates.
+        printf("Line %d:\n", line_number);
+        printf("  now_us: %u\n", now_us);
+        printf("  snd_cwnd: %u\n", tp->snd_cwnd);
+        printf("  snd_cwnd_cnt: %u\n", tp->snd_cwnd_cnt);
 
         if (ca->hspp_flag != HSPP_DEACTIVE)
             hystartpp_adjust_cwnd(sk, acked);
@@ -175,8 +179,6 @@ int main(int argc, char *argv[]) {
         // ⚠ USER NOTE: Print results and info based on your requirements.
         // -----------------------------------------------------------------------------
         // Print details
-        printf("Line %d:\n", line_number);
-        printf("  now_us: %u\n", now_us);
         printf("  hspp_end_seq: %u\n", ca->hspp_end_seq);
         printf("  hspp_rttsample_counter: %u\n", ca->hspp_rttsample_counter);
         printf("  hspp_current_round_minrtt: %u\n", ca->hspp_current_round_minrtt);
@@ -187,12 +189,13 @@ int main(int argc, char *argv[]) {
         printf("  hspp_flag: %u\n", ca->hspp_flag);
         printf("  snd_una: %u\n", tp->snd_una);
         printf("  loss happen: %u\n", LOSS_FLAG);
-        printf("  snd_cwnd: %u\n", tp->snd_cwnd);
-        printf("  snd_cwnd_cnt: %u\n", tp->snd_cwnd_cnt);
+        printf("\n");    
 
-
-        printf("\n");        
-
+        // Exit from test as loss happens
+        if (LOSS_FLAG == 1){
+            printf("Break as loss happened\n");
+            break;    
+        }
     }
 
     // -----------------------------------------------------------------------------

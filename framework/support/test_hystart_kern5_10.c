@@ -69,6 +69,7 @@ int main(int argc, char *argv[]) {
     tp->snd_cwnd = TCP_INIT_CWND;
     int EXIT_FLAG = 0;
     int LOSS_FLAG = 0;
+    u32 pre_acked = 0;
 
 
     char line[256];
@@ -96,11 +97,11 @@ int main(int argc, char *argv[]) {
                     
         // Variables to store parsed values
         u32 now_us, mss, rtt_us, tp_rate_interval_us, app_limited, tp_delivered_rate, tp_delivered, lost, retrans, sk_pacing_rate;
-        u64 bytes_acked, snd_nxt, snd_cwnd;
+        u64 bytes_acked, snd_nxt;
 
         // Parse the CSV line
-        if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u, %llu, %u, %llu", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
-                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate, &snd_cwnd) != 13) {
+        if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u,%llu, %u", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
+                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate) != 12) {
             fprintf(stderr, "Invalid line format at line %d: %s", line_number, line);
             continue;
         }
@@ -108,8 +109,16 @@ int main(int argc, char *argv[]) {
         /* Update the TCP socket state with the current input values */
         tp->snd_nxt = snd_nxt;
         sk->sk_pacing_rate = sk_pacing_rate;
-        tp->snd_cwnd = snd_cwnd;
 
+        // Convert cumulative ACKed bytes (from logs) into ACKed packet counts
+        u32 acked;
+        u32 delta_ack_pkt;
+        u32 cumulative_ack_pkts;
+
+        cumulative_ack_pkts = bytes_acked / mss;
+        delta_ack_pkt = cumulative_ack_pkts - pre_acked;
+        acked = delta_ack_pkt;
+        pre_acked = cumulative_ack_pkts;
 
         /* 
          * Initialize the connection state during the first data row.
@@ -121,7 +130,7 @@ int main(int argc, char *argv[]) {
          */
         if (line_number == 2 && line[0] != '#') {
             initial_seq = snd_nxt - (10 * mss);
-            first_ack_seq = snd_nxt;
+            // first_ack_seq = snd_nxt;
             ca->end_seq = initial_seq;
         }
         
@@ -163,6 +172,19 @@ int main(int argc, char *argv[]) {
             bictcp_hystart_reset(sk);
         }
 
+        // Print details
+        // This is aligned with the kernel log order, where CWND is logged prior to ACK-driven updates.
+        printf("Line %d:\n", line_number);
+        printf("  now_us: %u\n", now_us);
+        printf("  cwnd: %u\n", tp->snd_cwnd); 
+
+        // Note: cwnd only changes during slow start because we only call tcp_slow_start().
+        // After exiting slow start, cwnd will remain constant unless additional cwnd
+        // update logic is implemented for congestion avoidance.
+        if (tcp_in_slow_start(tp)) {
+            acked = tcp_slow_start(tp, acked);
+        }
+
         // -----------------------------------------------------------------------------
         // ⚠ USER NOTE: Print results and info based on your requirements.
         // -----------------------------------------------------------------------------
@@ -171,18 +193,17 @@ int main(int argc, char *argv[]) {
          * Detect and flag the presence of packet loss during the flow.
          * Only set LOSS_FLAG once (when loss is first seen).
          */
-        if (LOSS_FLAG == 0 && lost > 0)
+        if (LOSS_FLAG == 0 && lost > 0){
+            printf("  First Loss is happened at %u us\n", now_us);
             LOSS_FLAG = 1;
-        
+        }
 
         if (ca->found && EXIT_FLAG == 0) {
-            printf("HyStart Exits Slow Phase at %u us\n", now_us);
+            printf("  HyStart Exits Slow Phase at %u us\n", now_us);
             EXIT_FLAG = 1;
         }
 
         // Print details
-        printf("Line %d:\n", line_number);
-        printf("  now_us: %u\n", now_us);
         printf("  end_seq: %u\n", ca->end_seq);
         printf("  delay_min: %u\n", ca->delay_min);
         printf("  sample_count: %u\n", ca->sample_cnt);
@@ -194,8 +215,13 @@ int main(int argc, char *argv[]) {
         printf("  ack_seq: %u\n", ack_seq);
         printf("  initial_seq: %u\n", initial_seq);
         printf("  bytes_acked: %u\n", bytes_acked);
-        printf("  snd_cwnd: %u\n", tp->snd_cwnd);
         printf("\n");
+
+        // Exit from test as loss happens
+        if (LOSS_FLAG == 1){
+            printf("Break as loss happened\n");
+            break;    
+        }
     }
     // Clean up memory
     if (sk->bictcp) {
