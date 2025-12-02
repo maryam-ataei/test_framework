@@ -65,9 +65,10 @@ int main(int argc, char *argv[]) {
 
     // Initialize protocol-specific variables
     tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
+    tp->snd_cwnd = TCP_INIT_CWND;
     int EXIT_FLAG = 0;
     int LOSS_FLAG = 0;
-    u32 prev_snd_una = 0;
+    u32 pre_acked = 0;
 
     char line[256];
     int line_number = 0;
@@ -82,7 +83,6 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        // Variables to store parsed values
         // -----------------------------------------------------------------------------
         // ⚠ USER NOTE: Define the variables based on your protocol's input,
         // parse the CSV value, and set parsed values to the mock structure.
@@ -91,11 +91,10 @@ int main(int argc, char *argv[]) {
         // Variables to store parsed values
         u32 now_us, mss, rtt_us, tp_rate_interval_us, app_limited, tp_delivered_rate, tp_delivered, lost, retrans, sk_pacing_rate;
         u64 bytes_acked, snd_nxt, snd_una;
-        double snd_cwnd;
 
         // Parse the CSV line
-        if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u, %llu, %u, %lf, %llu", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
-                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate, &snd_una, &snd_cwnd) != 14) {
+        if (sscanf(line, "%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u, %llu, %u, %llu", &now_us, &bytes_acked, &mss, &rtt_us, &tp_delivered_rate, 
+                &tp_rate_interval_us, &tp_delivered, &lost, &retrans, &app_limited, &snd_nxt, &sk_pacing_rate, &snd_una) != 13) {
             fprintf(stderr, "Invalid line format at line %d: %s", line_number, line);
             continue;
         }
@@ -104,10 +103,30 @@ int main(int argc, char *argv[]) {
         tp->snd_nxt = snd_nxt;
         tp->snd_una = snd_una;
         sk->sk_pacing_rate = sk_pacing_rate;
-        tcp_snd_cwnd(tp) = (u32)snd_cwnd;
 
-        /* Use RTT sample from input; ensure non-zero delay 
-         *  (avoid divide-by-zero or meaningless results)
+        // Convert cumulative ACKed bytes (from logs) into ACKed packet counts
+        u32 acked;
+        u32 delta_ack_pkt;
+        u32 cumulative_ack_pkts;
+
+        cumulative_ack_pkts = bytes_acked / mss;
+        delta_ack_pkt = cumulative_ack_pkts - pre_acked;
+        acked = delta_ack_pkt;
+        pre_acked = cumulative_ack_pkts;
+
+        /* 
+         * Initialize the connection state during the first data row.
+         * Estimate the end sequence number based on snd_nxt and number of sent segments.
+         * - Assumes 10 segments (e.g., based on sent packet=10 at the time of first ack).
+         * - Sets ca->end_seq as the expected boundary for the current round.
+         */
+        if (line_number == 2 && line[0] != '#') {
+            ca->end_seq = snd_nxt - (10 * mss);
+        }
+
+        /* 
+         * Use RTT sample from input; ensure non-zero delay 
+         * (avoid divide-by-zero or meaningless results)
          */
         u32 delay;
         delay = rtt_us;
@@ -119,42 +138,38 @@ int main(int argc, char *argv[]) {
         if (ca->delay_min == 0 || ca->delay_min > delay)
             ca->delay_min = delay;
 
-        /* 
-         * Initialize the connection state during the first data row.
-         * Estimate the end sequence number based on snd_nxt and number of sent segments.
-         * - Assumes 10 segments (e.g., based on sent packet=10 at the time of first ack).
-         * - Sets ca->end_seq as the expected boundary for the current round.
-         */
-        if (line_number == 2 && line[0] != '#') {
-            ca->end_seq = snd_nxt - (10 * mss);           
+        // Call protocol-specific update functions    
+        /* Trigger HyStart */
+        hystart_update(sk, delay);
+
+        // Print details
+        // This is aligned with the kernel log order, where CWND is logged prior to ACK-driven updates.
+        printf("Line %d:\n", line_number);
+        printf("  now_us: %u\n", now_us);
+        printf("  cwnd: %u\n", tp->snd_cwnd); 
+
+        // Note: cwnd only changes during slow start because we only call tcp_slow_start().
+        // After exiting slow start, cwnd will remain constant unless additional cwnd
+        // update logic is implemented for congestion avoidance.
+        if (tcp_in_slow_start(tp)) {
+            acked = tcp_slow_start(tp, acked);
         }
 
         /*
          * Detect and flag the presence of packet loss during the flow.
          * Only set LOSS_FLAG once (when loss is first seen).
-         */
-        if (LOSS_FLAG == 0 && lost > 0)
+        */
+        if (LOSS_FLAG == 0 && lost > 0) {
+            printf("  First Loss is happened at %u us\n", now_us);
             LOSS_FLAG = 1;
+        }
         
-        // Call protocol-specific update functions
-        // -----------------------------------------------------------------------------
-        // ⚠ USER NOTE: Call the function(s) to start running your protocol.
-        // -----------------------------------------------------------------------------     
-        /* Trigger HyStart */
-        hystart_update(sk, delay);
-
-        // -----------------------------------------------------------------------------
-        // ⚠ USER NOTE: Print results and info based on your requirements.
-        // -----------------------------------------------------------------------------
-
         if (ca->found && EXIT_FLAG == 0) {
-            printf("HyStart Exits Slow Phase at %u us\n", now_us);
+            printf("  HyStart Exits Slow Phase at %u us\n", now_us);
             EXIT_FLAG = 1;
         }
 
         // Print details
-        printf("Line %d:\n", line_number);
-        printf("  now_us: %u\n", now_us);
         printf("  end_seq: %u\n", ca->end_seq);
         printf("  delay_min: %u\n", ca->delay_min);
         printf("  sample_count: %u\n", ca->sample_cnt);
@@ -164,8 +179,13 @@ int main(int argc, char *argv[]) {
         printf("  app_limited: %u\n", app_limited);
         printf("  loss happen: %u\n", LOSS_FLAG);
         printf("  snd_una: %u\n", tp->snd_una);
-
         printf("\n");
+
+        // Exit from test as loss happens
+        if (LOSS_FLAG == 1){
+            printf("Break as loss happened\n");
+            break;    
+        }
     }
     // Clean up memory
     if (sk->bictcp) {
