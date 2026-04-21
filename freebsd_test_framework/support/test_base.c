@@ -27,6 +27,7 @@
 // It contains the necessary structures, constants, and function
 // prototypes used by the congestion control algorithm. 
 // -----------------------------------------------------------------------------
+uint64_t mock_now_us = 0;  // Global definition for use in all modules
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -42,15 +43,14 @@ int main(int argc, char *argv[]) {
     }
 
     // Allocate memory for sock structure
-    struct sock *sk = malloc(sizeof(struct sock));
-    if (!sk) {
-        fprintf(stderr, "Failed to allocate memory for sock.\n");
-        fclose(file);
-        return 1;
-    }
-    memset(sk, 0, sizeof(struct sock));  // Initialize struct to zero
+    struct tcpcb *tp = calloc(1, sizeof(struct tcpcb));
+    struct cc_var ccv = {0};
+    ccv.ccvc.tcp = tp;
 
-    struct tcp_sock *tp = tcp_sk(sk);
+    // -----------------------------------------------------------------------------
+    // ⚠ USER NOTE: Allocate memory for structure based on your algorithm
+    // ----------------------------------------------------------------------------- 
+
 
     // -----------------------------------------------------------------------------
     // ⚠ USER NOTE: 
@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
     // This ensures proper resource management and prevents memory leaks.
     // -----------------------------------------------------------------------------
 
-    free(sk);
+    free(tp);
     fclose(file);
 
     printf("Finished processing.\n");

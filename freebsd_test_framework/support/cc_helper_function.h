@@ -22,6 +22,7 @@
 #define tick 1000000  // Or another appropriate value depending on your model
 #define V_tcp_initcwnd_segments 10
 #define TCP_INFINITE_SSTHRESH    0x7fffffff
+#define TCP_MAXWIN  65535
 
 extern uint64_t mock_now_us;
 
